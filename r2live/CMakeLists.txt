@@ -1,18 +1,22 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(r2live)
 
-# ADD_COMPILE_OPTIONS(-std=c++14 )
-# set(CMAKE_BUILD_TYPE "Release")
-# set(CMAKE_CXX_FLAGS "-std=c++14")
-# #-DEIGEN_USE_MKL_ALL")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(DEFAULT_BUILD_TYPE "Release")
 
-set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++17 -O3 -w")
-set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions -g -ggdb")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS}")
+
+# set(CMAKE_BUILD_TYPE "Release")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++17 -O3 -w")
+# set (CMAKE_CXX_STANDARD 17)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
@@ -71,7 +75,11 @@ include_directories(
 catkin_package(DEPENDS PCL)
 
 add_executable(lio_feat_extract src/fast_lio/feature_extract.cpp)
-target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES}
+    /usr/local/lib/libtbb.so
+    /usr/local/lib/libtbbmalloc.so
+    /usr/local/lib/libtbbmalloc_proxy.so
+    )
 
 add_executable(r2live
     src/estimator_node.cpp
@@ -94,6 +102,13 @@ add_executable(r2live
     src/fast_lio/IMU_Processing.cpp
     )
 
-target_link_libraries(r2live ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) 
+target_link_libraries(r2live 
+${catkin_LIBRARIES}
+${OpenCV_LIBS} 
+${CERES_LIBRARIES}
+/usr/local/lib/libtbb.so
+/usr/local/lib/libtbbmalloc.so
+/usr/local/lib/libtbbmalloc_proxy.so
+) 
 
 

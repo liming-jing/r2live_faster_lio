@@ -69,6 +69,10 @@
 // namespace plt = matplotlibcpp;
 #endif
 
+#include <memory.h>
+// 引入ivox 数据结构
+#include "ivox3d/ivox3d.h"
+
 
 
 #define INIT_TIME (0)
@@ -88,6 +92,12 @@ extern StatesGroup g_lio_state;
 extern std::shared_ptr<ImuProcess> g_imu_process;
 extern double g_lidar_star_tim;
 
+#ifdef IVOX_NODE_TYPE_PHC
+    using IVoxType = IVox<3, IVoxNodeType::PHC, PointType>;
+#else
+    using IVoxType = IVox<3, IVoxNodeType::DEFAULT, PointType>;
+#endif
+
 class Fast_lio
 {
 public:
@@ -97,6 +107,9 @@ public:
     std::string root_dir = ROOT_DIR;
 
     std::string imu_topic;
+
+    IVoxType::Options ivox_options_; 
+    std::shared_ptr<IVoxType> ivox_ = nullptr;                    // localmap in ivox
 
     double m_maximum_pt_kdtree_dis = 1.0;
     double m_maximum_res_dis = 1.0;
@@ -159,6 +172,7 @@ public:
     bool cube_updated[laserCloudNum];
     int laserCloudValidInd[laserCloudNum];
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
+
 
 #ifdef USE_ikdtree
     KD_TREE ikdtree;
@@ -827,8 +841,26 @@ public:
 
         downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min_z);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
-        // m_lio_state_fp = fopen("/home/ziv/temp/lic_lio.log", "w+");
-        // m_lio_costtime_fp = fopen("/home/ziv/temp/lic_lio_costtime.log", "w+");
+       
+
+        int ivox_nearby_type = 0;
+        get_ros_parameter(nh, "fast_lio/ivox_grid_resolution",  ivox_options_.resolution_, float(0.2));
+        get_ros_parameter(nh, "fast_lio/ivox_nearby_type", ivox_nearby_type, 18);
+
+        ivox_ = std::make_shared<IVoxType>(ivox_options_);
+
+        if (ivox_nearby_type == 0) {
+            ivox_options_.nearby_type_ = IVoxType::NearbyType::CENTER;
+        } else if (ivox_nearby_type == 6) {
+            ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY6;
+        } else if (ivox_nearby_type == 18) {
+            ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY18;
+        } else if (ivox_nearby_type == 26) {
+            ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY26;
+        } else {
+            LOG(WARNING) << "unknown ivox_nearby_type, use NEARBY18";
+            ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY18;
+        }
         printf_line;
         m_thread_process = std::thread(&Fast_lio::process, this);
         printf_line;
@@ -900,11 +932,8 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             while (g_camera_lidar_queue.if_lidar_can_process() == false)
             {
-                // scope_color(ANSI_COLOR_YELLOW_BOLD);
-                // cout << "Wait camera queue" << endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
-            // while (sync_packages(Measures))
             std::unique_lock<std::mutex> lock(m_mutex_lio_process);
             if(1)
             {
@@ -917,8 +946,7 @@ public:
                     continue;
                 }
                 int lidar_can_update = 1;
-                // ANCHOR - Determine if LiDAR can perform update
-                // if(Measures.imu.back()->header.stamp.toSec() < g_lio_state.last_update_time )
+               
                 if (Measures.lidar_beg_time + 0.1 < g_lio_state.last_update_time)
                 {
                     if (1)
