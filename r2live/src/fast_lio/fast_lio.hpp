@@ -886,8 +886,6 @@ public:
         else
             std::cout << "~~~~" << ROOT_DIR << " doesn't exist" << std::endl;
 
-        //------------------------------------------------------------------------------------------------------
-        // signal(SIGINT, &fast_lio::SigHandle, this);
         ros::Rate rate(5000);
         bool status = ros::ok();
         g_camera_lidar_queue.m_liar_frame_buf = &lidar_buffer;
@@ -900,11 +898,8 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             while (g_camera_lidar_queue.if_lidar_can_process() == false)
             {
-                // scope_color(ANSI_COLOR_YELLOW_BOLD);
-                // cout << "Wait camera queue" << endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
-            // while (sync_packages(Measures))
             std::unique_lock<std::mutex> lock(m_mutex_lio_process);
             if(1)
             {
@@ -917,8 +912,6 @@ public:
                     continue;
                 }
                 int lidar_can_update = 1;
-                // ANCHOR - Determine if LiDAR can perform update
-                // if(Measures.imu.back()->header.stamp.toSec() < g_lio_state.last_update_time )
                 if (Measures.lidar_beg_time + 0.1 < g_lio_state.last_update_time)
                 {
                     if (1)
@@ -989,11 +982,6 @@ public:
                 Eigen::Vector3d euler_cur = RotMtoEuler(g_lio_state.rot_end);
                 fout_pre << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " " << g_lio_state.vel_end.transpose()
                          << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose() << std::endl;
-#ifdef DEBUG_PRINT
-                std::cout << "current lidar time " << Measures.lidar_beg_time << " "
-                          << "first lidar time " << first_lidar_time << std::endl;
-                std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " " << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose() << std::endl;
-#endif
 
                 /*** Segment the map in lidar FOV ***/
                 lasermap_fov_segment();
@@ -1002,7 +990,6 @@ public:
                 downSizeFilterSurf.setInputCloud(feats_undistort);
                 downSizeFilterSurf.filter(*feats_down);
 
-#ifdef USE_ikdtree
                 /*** initialize the map kdtree ***/
                 if ((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
                 {
@@ -1020,21 +1007,7 @@ public:
                     continue;
                 }
                 int featsFromMapNum = ikdtree.size();
-#else
-                if (featsFromMap->points.empty())
-                {
-                    downSizeFilterMap.setInputCloud(feats_down);
-                }
-                else
-                {
-                    downSizeFilterMap.setInputCloud(featsFromMap);
-                }
-                downSizeFilterMap.filter(*featsFromMap);
-                int featsFromMapNum = featsFromMap->points.size();
-#endif
                 int feats_down_size = feats_down->points.size();
-                //std::cout << "[ mapping ]: Raw feature num: " << feats_undistort->points.size() << " downsamp num " << feats_down_size << " Map num: " << featsFromMapNum << " laserCloudValidNum " << laserCloudValidNum << std::endl;
-
                 /*** ICP and iterated Kalman filter update ***/
                 PointCloudXYZI::Ptr coeffSel_tmpt(new PointCloudXYZI(*feats_down));
                 PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI(*feats_down));
@@ -1043,19 +1016,13 @@ public:
                 if (featsFromMapNum >= 5)
                 {
                     t1 = omp_get_wtime();
-
-#ifdef USE_ikdtree
-                    if (m_if_publish_feature_map)
+                     if (m_if_publish_feature_map)
                     {
                         PointVector().swap(ikdtree.PCL_Storage);
                         ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
                         featsFromMap->clear();
                         featsFromMap->points = ikdtree.PCL_Storage;
                     }
-#else
-                    kdtreeSurfFromMap->setInputCloud(featsFromMap);
-                    kdtree_incremental_time = omp_get_wtime() - t1;
-#endif
 
                     std::vector<bool> point_selected_surf(feats_down_size, true);
                     std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
@@ -1087,21 +1054,13 @@ public:
                             /* transform to world frame */
                             pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
                             std::vector<float> pointSearchSqDis_surf;
-#ifdef USE_ikdtree
                             auto &points_near = Nearest_Points[i];
-#else
-                            auto &points_near = pointSearchInd_surf[i];
-#endif
 
                             if (iterCount == 0 || rematch_en)
                             {
                                 point_selected_surf[i] = true;
                                 /** Find the closest surfaces in the map **/
-#ifdef USE_ikdtree
                                 ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-#else
-                                kdtreeSurfFromMap->nearestKSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-#endif
                                 float max_distance = pointSearchSqDis_surf[NUM_MATCH_POINTS - 1];
                                 //  max_distance to add residuals
                                 // ANCHOR - Long range pt stragetry
@@ -1125,21 +1084,10 @@ public:
 
                             for (int j = 0; j < NUM_MATCH_POINTS; j++)
                             {
-#ifdef USE_ikdtree
                                 matA0.at<float>(j, 0) = points_near[j].x;
                                 matA0.at<float>(j, 1) = points_near[j].y;
                                 matA0.at<float>(j, 2) = points_near[j].z;
-#else
-                                matA0.at<float>(j, 0) = featsFromMap->points[points_near[j]].x;
-                                matA0.at<float>(j, 1) = featsFromMap->points[points_near[j]].y;
-                                matA0.at<float>(j, 2) = featsFromMap->points[points_near[j]].z;
-#endif
                             }
-
-                            //matA0*matX0=matB0
-                            //AX+BY+CZ+D = 0 <=> AX+BY+CZ=-D <=> (A/D)X+(B/D)Y+(C/D)Z = -1
-                            //(X,Y,Z)<=>mat_a0
-                            //A/D, B/D, C/D <=> mat_x0
 
                             cv::solve(matA0, matB0, matX0, cv::DECOMP_QR); //TODO
 
@@ -1158,17 +1106,11 @@ public:
 
                             bool planeValid = true;
                             for (int j = 0; j < NUM_MATCH_POINTS; j++)
-                            {
-#ifdef USE_ikdtree              
+                            {           
                                 // ANCHOR -  Planar check
                                 if (fabs(pa * points_near[j].x +
                                          pb * points_near[j].y +
-                                         pc * points_near[j].z + pd) > m_planar_check_dis) // Raw 0.05
-#else
-                                if (fabs(pa * featsFromMap->points[points_near[j]].x +
-                                         pb * featsFromMap->points[points_near[j]].y +
-                                         pc * featsFromMap->points[points_near[j]].z + pd) > 0.1)
-#endif
+                                         pc * points_near[j].z + pd) > m_planar_check_dis) // Raw 0.0
                                 {
                                     // ANCHOR - Far distance pt processing
                                     if (ori_pt_dis < maximum_pt_range * 0.90 || (ori_pt_dis < m_long_rang_pt_dis))
@@ -1179,12 +1121,6 @@ public:
                                         break;
                                     }
                                 }
-                                // if(maximum_pt_range > 10.0  && ori_pt_dis < 5)
-                                // {
-                                //     planeValid = false;
-                                //     point_selected_surf[i] = false;
-                                //     break;
-                                // }
                             }
 
                             if (planeValid)
@@ -1199,20 +1135,12 @@ public:
                                 //double acc_distance = m_maximum_res_dis;
                                 if(pd2 < acc_distance)
                                 {
-                                    // if(std::abs(pd2) > 5 * res_mean_last)
-                                    // {
-                                    //     point_selected_surf[i] = false;
-                                    //     res_last[i] = 0.0;
-                                    //     continue;
-                                    // }
                                     point_selected_surf[i] = true;
                                     coeffSel_tmpt->points[i].x = pa;
                                     coeffSel_tmpt->points[i].y = pb;
                                     coeffSel_tmpt->points[i].z = pc;
                                     coeffSel_tmpt->points[i].intensity = pd2;
-
-                                    // if(i%50==0) std::cout<<"s: "<<s<<"last res: "<<res_last[i]<<" current res: "<<std::abs(pd2)<<std::endl;
-                                    res_last[i] = std::abs(pd2);
+                                    res_last[i] = std::abs(pd2);                               
                                 }
                                 else
                                 {
@@ -1326,10 +1254,6 @@ public:
                             deltaT = t_add.norm() * 100;
                         }
                         euler_cur = RotMtoEuler(g_lio_state.rot_end);
-#ifdef DEBUG_PRINT
-                        std::cout << "update: R" << euler_cur.transpose() * 57.3 << " p " << g_lio_state.pos_end.transpose() << " v " << g_lio_state.vel_end.transpose() << " bg" << g_lio_state.bias_g.transpose() << " ba" << g_lio_state.bias_a.transpose() << std::endl;
-                        std::cout << "dR & dT: " << deltaR << " " << deltaT << " res norm:" << res_mean_last << std::endl;
-#endif
 
                         /*** Rematch Judgement ***/
                         rematch_en = false;
@@ -1363,7 +1287,6 @@ public:
                     t3 = omp_get_wtime();
 
                     /*** add new frame points to map ikdtree ***/
-#ifdef USE_ikdtree
                     PointVector points_history;
                     ikdtree.acquire_removed_points(points_history);
 
@@ -1403,43 +1326,6 @@ public:
                     t4 = omp_get_wtime();
                     ikdtree.Add_Points(feats_down_updated->points, true);
                     kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
-#else
-                    bool cube_updated[laserCloudNum] = {0};
-                    for (int i = 0; i < feats_down_size; i++)
-                    {
-                        PointType &pointSel = feats_down_updated->points[i];
-
-                        int cubeI = int((pointSel.x + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
-                        int cubeJ = int((pointSel.y + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
-                        int cubeK = int((pointSel.z + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
-
-                        if (pointSel.x + 0.5 * cube_len < 0)
-                            cubeI--;
-                        if (pointSel.y + 0.5 * cube_len < 0)
-                            cubeJ--;
-                        if (pointSel.z + 0.5 * cube_len < 0)
-                            cubeK--;
-
-                        if (cubeI >= 0 && cubeI < laserCloudWidth &&
-                            cubeJ >= 0 && cubeJ < laserCloudHeight &&
-                            cubeK >= 0 && cubeK < laserCloudDepth)
-                        {
-                            int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
-                            featsArray[cubeInd]->push_back(pointSel);
-                            cube_updated[cubeInd] = true;
-                        }
-                    }
-                    for (int i = 0; i < laserCloudValidNum; i++)
-                    {
-                        int ind = laserCloudValidInd[i];
-
-                        if (cube_updated[ind])
-                        {
-                            downSizeFilterMap.setInputCloud(featsArray[ind]);
-                            downSizeFilterMap.filter(*featsArray[ind]);
-                        }
-                    }
-#endif
                     t5 = omp_get_wtime();
                 }
 
@@ -1580,10 +1466,6 @@ public:
                 s_plot5[time_log_counter] = t5 - t0;
                 s_plot6[time_log_counter] = readd_box_time;
                 time_log_counter++;
-                
-                // std::cout << "[ mapping ]: time: fov_check " << fov_check_time << " copy map " << copy_time << " readd: " << readd_time << " match " << match_time << " solve " << solve_time << "acquire: " << t4 - t3 << " map incre " << t5 - t4 << " total " << aver_time_consu << std::endl;
-                // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << g_lio_state.pos_end.transpose() << " " << g_lio_state.vel_end.transpose() \
-            // <<" "<<g_lio_state.bias_g.transpose()<<" "<<g_lio_state.bias_a.transpose()<< std::endl;
                 fout_out << std::setw(8) << laserCloudSelNum << " " << Measures.lidar_beg_time << " " << t2 - t0 << " " << match_time << " " << t5 - t3 << " " << t5 - t0 << std::endl;
             }
             status = ros::ok();
