@@ -111,6 +111,8 @@ public:
     IVoxType::Options ivox_options_; 
     std::shared_ptr<IVoxType> ivox_ = nullptr;                    // localmap in ivox
 
+    bool flg_first_scan_ = true;    
+
     double m_maximum_pt_kdtree_dis = 1.0;
     double m_maximum_res_dis = 1.0;
     double m_planar_check_dis = 0.05;
@@ -1023,10 +1025,24 @@ public:
                 std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " " << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose() << std::endl;
 #endif
 
+#ifndef IVOX
                 /*** Segment the map in lidar FOV ***/
                 lasermap_fov_segment();
+#endif
 
-                /*** downsample the features of new frame ***/
+#ifdef IVOX  
+                // 首次插入点云数据
+                if (flg_first_scan_)
+                {
+                    ivox_->AddPoints(feats_undistort->points);
+                    flg_first_scan_ = false;
+                    std::cout << "~~~~Initiallize Map IVOX !" << std::endl;
+                    continue;
+                }
+
+#endif
+
+                 /*** downsample the features of new frame ***/
                 downSizeFilterSurf.setInputCloud(feats_undistort);
                 downSizeFilterSurf.filter(*feats_down);
 
