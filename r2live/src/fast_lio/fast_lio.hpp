@@ -160,11 +160,8 @@ public:
     int laserCloudValidInd[laserCloudNum];
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
 
-#ifdef USE_ikdtree
     KD_TREE ikdtree;
-#else
-    pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
-#endif
+
 #ifdef USE_FOV_Checker
     FOV_Checker fov_checker;
     double FOV_depth;
@@ -497,77 +494,7 @@ public:
         memset(now_inFOV, 0, sizeof(now_inFOV));
         copy_time = omp_get_wtime() - t_begin;
         double fov_check_begin = omp_get_wtime();
-// std::cout<<"centerCubeIJK: "<<centerCubeI<<" "<<centerCubeJ<<" "<<centerCubeK<<std::endl;
-// std::cout<<"laserCloudCen: "<<laserCloudCenWidth<<" "<<laserCloudCenHeight<<" "<<laserCloudCenDepth<<std::endl;
-#ifdef USE_FOV_Checker
-        BoxPointType env_box;
-        env_box.vertex_min[0] = max(centerCubeI - FOV_RANGE, 0) * cube_len - laserCloudWidth * cube_len / 2.0;
-        env_box.vertex_max[0] = min(centerCubeI + FOV_RANGE, laserCloudWidth) * cube_len - laserCloudWidth * cube_len / 2.0;
-        env_box.vertex_min[1] = max(centerCubeJ - FOV_RANGE, 0) * cube_len - laserCloudHeight * cube_len / 2.0;
-        env_box.vertex_max[1] = min(centerCubeJ + FOV_RANGE, laserCloudHeight) * cube_len - laserCloudHeight * cube_len / 2.0;
-        env_box.vertex_min[2] = max(centerCubeK - FOV_RANGE, 0) * cube_len - laserCloudDepth * cube_len / 2.0;
-        env_box.vertex_max[2] = min(centerCubeK + FOV_RANGE, laserCloudDepth) * cube_len - laserCloudDepth * cube_len / 2.0;
-        fov_checker.Set_Env(env_box);
-        fov_checker.Set_BoxLength(cube_len);
-        FOV_depth = FOV_RANGE * cube_len;
-        theta = ceil(FOV_DEG / 2.0) / 180 * PI_M;
-        Eigen::Vector3卡d tmp = g_lio_state.rot_end.transpose() * Eigen::Vector3d(1, 0, 0);
-        FOV_axis(0) = tmp(0);
-        FOV_axis(1) = -tmp(1);
-        FOV_axis(2) = -tmp(2);
-        FOV_pos = g_lio_state.pos_end;
-        fov_checker.check_fov(FOV_pos, FOV_axis, theta, FOV_depth, boxes);
-        // FILE *fp;
-        // fp = fopen("/home/ecstasy/catkin_ws/fov_data.csv","a");
-        // fprintf(fp,"%d,",int(boxes.size()));
-        // fprintf(fp,"%f,%f,%f,",tmp(0), tmp(1), tmp(2));
-        int cube_i, cube_j, cube_k;
-        for (int i = 0; i < boxes.size(); i++)
-        {
-            cube_i = floor((boxes[i].vertex_min[0] + eps_value + laserCloudWidth * cube_len / 2.0) / cube_len);
-            cube_j = floor((boxes[i].vertex_min[1] + eps_value + laserCloudHeight * cube_len / 2.0) / cube_len);
-            cube_k = floor((boxes[i].vertex_min[2] + eps_value + laserCloudDepth * cube_len / 2.0) / cube_len);
-            cube_index = cube_ind(cube_i, cube_j, cube_k);
-#ifdef USE_ikdtree
-            *cube_points_add += *featsArray[cube_index];
-            featsArray[cube_index]->clear();
-            now_inFOV[cube_index] = true;
-            if (!_last_inFOV[cube_index])
-            {
-                cub_needad.push_back(boxes[i]);
-                laserCloudValidInd[laserCloudValidNum] = cube_index;
-                laserCloudValidNum++;
-                _last_inFOV[cube_index] = true;
-            }
-#else
-            *featsFromMap += *featsArray[cube_index];
-            laserCloudValidInd[laserCloudValidNum] = cube_index;
-            laserCloudValidNum++;
-#endif
-        }
-#ifdef USE_ikdtree
-        BoxPointType rm_box;
-        for (int i = 0; i < laserCloudNum; i++)
-        {
-            if (_last_inFOV[i] && !now_inFOV[i])
-            {
-                cube_i = i % laserCloudWidth;
-                cube_j = (i % (laserCloudWidth * laserCloudHeight)) / laserCloudWidth;
-                cube_k = i / (laserCloudWidth * laserCloudHeight);
-                rm_box.vertex_min[0] = cube_i * cube_len - laserCloudWidth * cube_len / 2.0;
-                rm_box.vertex_max[0] = rm_box.vertex_min[0] + cube_len;
-                rm_box.vertex_min[1] = cube_j * cube_len - laserCloudHeight * cube_len / 2.0;
-                rm_box.vertex_max[1] = rm_box.vertex_min[1] + cube_len;
-                rm_box.vertex_min[2] = cube_k * cube_len - laserCloudDepth * cube_len / 2.0;
-                rm_box.vertex_max[2] = rm_box.vertex_min[2] + cube_len;
-                cub_needrm.push_back(rm_box);
-                _last_inFOV[i] = false;
-            }
-        }
-#endif
-        // fprintf(fp,"\n");
-        // fclose(fp);
-#else
+
         for (int i = centerCubeI - FOV_RANGE; i <= centerCubeI + FOV_RANGE; i++)
         {
             for (int j = centerCubeJ - FOV_RANGE; j <= centerCubeJ + FOV_RANGE; j++)
@@ -604,7 +531,6 @@ public:
 
                         now_inFOV[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] = inFOV;
 
-#ifdef USE_ikdtree
                         /*** readd cubes and points ***/
                         if (inFOV)
                         {
@@ -625,23 +551,10 @@ public:
                                 // std::cout<<"readd center: "<<center_p.transpose()<<std::endl;
                             }
                         }
-
-#else
-                        if (inFOV)
-                        {
-                            int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
-                            *featsFromMap += *featsArray[center_index];
-                            laserCloudValidInd[laserCloudValidNum] = center_index;
-                            laserCloudValidNum++;
-                        }
-                        last_inFOV = inFOV;
-#endif
                     }
                 }
             }
         }
-
-#ifdef USE_ikdtree
         /*** delete cubes ***/
         for (int i = 0; i < laserCloudWidth; i++)
         {
@@ -669,12 +582,10 @@ public:
                 }
             }
         }
-#endif
-#endif
         fov_check_time = omp_get_wtime() - fov_check_begin;
 
         double readd_begin = omp_get_wtime();
-#ifdef USE_ikdtree
+
         if (cub_needrm.size() > 0)
             ikdtree.Delete_Point_Boxes(cub_needrm);
         delete_box_time = omp_get_wtime() - readd_begin;
@@ -685,7 +596,6 @@ public:
         // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
         if (cube_points_add->points.size() > 0)
             ikdtree.Add_Points(cube_points_add->points, true);
-#endif
         readd_time = omp_get_wtime() - readd_begin - delete_box_time - readd_box_time;
         // s_plot6.push_back(omp_get_wtime() - t_begin);
     }
@@ -914,26 +824,13 @@ public:
                 int lidar_can_update = 1;
                 if (Measures.lidar_beg_time + 0.1 < g_lio_state.last_update_time)
                 {
-                    if (1)
-                    {
-                        ROS_WARN("Drop LiDAR frame [C|L|I]: [ %.4f |%.4f | %.4f], %.4f ", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time,
-                                 Measures.lidar_beg_time - g_camera_lidar_queue.m_first_imu_time,
-                                 g_camera_lidar_queue.m_last_imu_time - g_camera_lidar_queue.m_first_imu_time,
-                                 g_lio_state.last_update_time - Measures.lidar_beg_time);
-                    }
+                   
+                    ROS_WARN("Drop LiDAR frame [C|L|I]: [ %.4f |%.4f | %.4f], %.4f ", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time,
+                                Measures.lidar_beg_time - g_camera_lidar_queue.m_first_imu_time,
+                                g_camera_lidar_queue.m_last_imu_time - g_camera_lidar_queue.m_first_imu_time,
+                                g_lio_state.last_update_time - Measures.lidar_beg_time);
                     lidar_can_update = 0;
-                    //continue;
                 }
-                else
-                {
-                    if (0)
-                    {
-                        ROS_INFO("Acc LiDAR frame [C|L|I]: [ %.4f | %.4f | %.4f], %.4f  ", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time,
-                                 Measures.lidar_beg_time - g_camera_lidar_queue.m_first_imu_time,
-                                 g_camera_lidar_queue.m_last_imu_time - g_camera_lidar_queue.m_first_imu_time,
-                                 g_lio_state.last_update_time - Measures.lidar_beg_time);
-                    }
-                }                
                 // printf_line;
                 lidar_can_update = 1;
                 g_lidar_star_tim = first_lidar_time;
@@ -1442,9 +1339,6 @@ public:
                     message.transforms.push_back(msg);
                     g_camera_lidar_queue.m_bag_for_record.write("/tf", ros::Time().fromSec(Measures.lidar_end_time), message);
                 }
-#ifdef DEPLOY
-                mavros_pose_publisher.publish(msg_body_pose);
-#endif
 
                 /******* Publish Path ********/
                 msg_body_pose.header.frame_id = "world";

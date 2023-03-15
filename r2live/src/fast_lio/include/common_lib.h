@@ -22,10 +22,8 @@
 #include <deque>
 #include "r2live_sophus/se3.hpp"
 #include "r2live_sophus/so3.hpp"
-// #define DEBUG_PRINT
-#define USE_ikdtree
+
 #define ESTIMATE_GRAVITY 0
-// #define USE_FOV_Checker
 
 #define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
 
