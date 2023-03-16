@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <queue>
 #include <map>
 #include <thread>
@@ -16,6 +17,7 @@
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
 StatesGroup g_lio_state;
+std::string sys_time;
 
 Estimator estimator;
 
@@ -428,6 +430,10 @@ void process()
 
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
+
+    std::string document_path = "/home/jlm/File/OSCode/ws_r2live/src/r2live/LOG/";
+    std::string odom_file = document_path + "vo_odom_" + sys_time + ".txt";
+    std::string vo_using_time_file = document_path + "vo_using_time_" + sys_time + ".txt";
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
@@ -795,17 +801,17 @@ void process()
             unlock_lio(estimator);
             m_state.lock();
             double whole_t = t_s.toc();
-            printStatistics(estimator, whole_t);
+            printStatistics(estimator, whole_t, vo_using_time_file);
             header = img_msg->header;
             header.frame_id = "world";
   
             if (g_camera_lidar_queue.m_if_have_lidar_data == false)
             {
-                pubOdometry(estimator, header);
+                pubOdometry(estimator, header, odom_file);
             }
             else
             {
-                pub_LiDAR_Odometry(estimator, state_aft_integration, header);
+                pub_LiDAR_Odometry(estimator, state_aft_integration, header, odom_file);
             }
             pubCameraPose(estimator, header);
             pubKeyPoses(estimator, header);
@@ -829,6 +835,17 @@ void process()
         m_state.unlock();
         m_buf.unlock();
     }
+}
+
+
+std::string getSystemTime()
+{
+    FILE *fp = NULL;
+    time_t timep;
+    char name[256] = {0};
+    time(&timep);//获取从1970至今过了多少秒，存入time_t类型的timep
+    strftime(name, sizeof(name), "%Y_%m_%d_%H_%M_%S",localtime(&timep)); 
+    return name;
 }
 
 int main(int argc, char **argv)
@@ -868,7 +885,8 @@ int main(int argc, char **argv)
     ros::Subscriber sub_restart = nh.subscribe("/feature_tracker/restart", 20000, restart_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_relo_points = nh.subscribe("/pose_graph/match_points", 20000, relocalization_callback, ros::TransportHints().tcpNoDelay());
 
-    std::thread measurement_process{process};
+    sys_time = getSystemTime();
+    std::thread measurement_process(process);
     ros::spin();
 
     return 0;

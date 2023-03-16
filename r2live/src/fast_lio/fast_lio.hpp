@@ -69,6 +69,7 @@
 // namespace plt = matplotlibcpp;
 #endif
 
+#include "../utility/tic_toc.h"
 
 
 #define INIT_TIME (0)
@@ -88,6 +89,16 @@ extern StatesGroup g_lio_state;
 extern std::shared_ptr<ImuProcess> g_imu_process;
 extern double g_lidar_star_tim;
 
+extern std::string getSystemTime();
+// {
+//     FILE *fp = NULL;
+//     time_t timep;
+//     char name[256] = {0};
+//     time(&timep);//获取从1970至今过了多少秒，存入time_t类型的timep
+//     strftime(name, sizeof(name), "%Y_%m_%d_%H_%M_%S",localtime(&timep)); 
+//     return name;
+// }
+
 class Fast_lio
 {
 public:
@@ -95,6 +106,9 @@ public:
 
     std::shared_ptr<ImuProcess> m_imu_process;
     std::string root_dir = ROOT_DIR;
+    std::string sys_time;
+    std::string lo_using_time_file;
+    std::string lo_odom_file;
 
     std::string imu_topic;
 
@@ -199,6 +213,27 @@ public:
         flg_exit = true;
         ROS_WARN("catch sig %d", sig);
         sig_buffer.notify_all();
+    }
+
+    void WriteOdom2File(const nav_msgs::Odometry& odomAftMapped, const ros::Time & time, std::string file)
+    {
+        std::ofstream foutC(file, std::ios::app);
+        if (!foutC.is_open())
+        {
+            std::cerr << "file can't open!" << std::endl;
+            std::cerr << __func__ << " : " << __LINE__ << std::endl;
+            exit(1);
+        }
+        
+        foutC << to_string(time.toSec()) << " "
+              << odomAftMapped.pose.pose.position.x << " "
+              << odomAftMapped.pose.pose.position.y << " "
+              << odomAftMapped.pose.pose.position.z << " "
+              << odomAftMapped.pose.pose.orientation.x << " "
+              << odomAftMapped.pose.pose.orientation.y << " "
+              << odomAftMapped.pose.pose.orientation.z << " "
+              << odomAftMapped.pose.pose.orientation.w << std::endl;
+        foutC.close();
     }
 
     //project lidar frame to world
@@ -737,8 +772,13 @@ public:
 
         downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min_z);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
-        // m_lio_state_fp = fopen("/home/ziv/temp/lic_lio.log", "w+");
-        // m_lio_costtime_fp = fopen("/home/ziv/temp/lic_lio_costtime.log", "w+");
+        
+
+        sys_time = getSystemTime();
+        std::string document_path = "/home/jlm/File/OSCode/ws_r2live/src/r2live/LOG/";
+        lo_using_time_file = document_path + "lo_using_time_" + sys_time + ".txt";
+        lo_odom_file = document_path + "lo_odom_" + sys_time + ".txt";
+
         printf_line;
         m_thread_process = std::thread(&Fast_lio::process, this);
         printf_line;
@@ -852,6 +892,9 @@ public:
                 t0 = omp_get_wtime();
 
                 p_imu->Process(Measures, g_lio_state, feats_undistort);
+
+                TicToc lo_using_time;
+
                 g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
                 g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
                 StatesGroup state_propagat(g_lio_state);
@@ -939,7 +982,7 @@ public:
                         coeffSel->clear();
 
                         /** closest surface search and residual computation **/
-                        omp_set_num_threads(4);
+                        // omp_set_num_threads(4);
 // #pragma omp parallel for
                         for (int i = 0; i < feats_down_size; i++)
                         {
@@ -1183,6 +1226,17 @@ public:
                     
                     t3 = omp_get_wtime();
 
+                   
+                    std::ofstream foutC(lo_using_time_file, std::ios::app);
+                    if (!foutC.is_open())
+                    {
+                        std::cerr << "文件未打开" << std::endl;
+                        std::cerr << __func__ << " : " << __LINE__ << std::endl;
+                    }
+                    foutC << to_string(lo_using_time.toc()) << std::endl;
+                    foutC.close();
+                    /** 将lo_using_time 写入文件 **/
+
                     /*** add new frame points to map ikdtree ***/
                     PointVector points_history;
                     ikdtree.acquire_removed_points(points_history);
@@ -1294,6 +1348,10 @@ public:
                 odomAftMapped.pose.pose.position.z = g_lio_state.pos_end(2);
 
                 pubOdomAftMapped.publish(odomAftMapped);
+
+                WriteOdom2File(odomAftMapped, ros::Time().fromSec(last_timestamp_lidar), lo_odom_file);
+
+
                 if (g_camera_lidar_queue.m_if_write_res_to_bag)
                 {
                     g_camera_lidar_queue.m_bag_for_record.write(pubOdomAftMapped.getTopic(), ros::Time().fromSec(Measures.lidar_end_time), odomAftMapped);

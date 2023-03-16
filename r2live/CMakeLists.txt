@@ -14,6 +14,9 @@ set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# gcc 兼容问题
+# ADD_DEFINITIONS(-fpermissive)
+
 add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
 find_package(catkin REQUIRED COMPONENTS
