@@ -216,7 +216,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 }
 
 template <typename T>
-T get_ros_parameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
+T GetROSParameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
 {
     nh.param<T>(parameter_name.c_str(), parameter, default_val);
     // ENABLE_SCREEN_PRINTF;
@@ -233,7 +233,7 @@ int main(int argc, char **argv)
 
 	cv::theRNG().state = 0; // Set random seed
     readParameters(n);
-    get_ros_parameter<std::string>(n, "image_topic", IMAGE_TOPIC, "/camera/image_color");
+    GetROSParameter<std::string>(n, "image_topic", IMAGE_TOPIC, "/camera/image_color");
     for (int i = 0; i < NUM_OF_CAM; i++)
         trackerData[i].readIntrinsicParameter(CAM_NAMES[i]);
 

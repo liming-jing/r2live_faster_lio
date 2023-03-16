@@ -857,12 +857,12 @@ int main(int argc, char **argv)
     readParameters(nh);
     estimator.setParameter();
 
-    get_ros_parameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
-    get_ros_parameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
-    get_ros_parameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
-    get_ros_parameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
-    get_ros_parameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
-    get_ros_parameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
+    GetROSParameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
+    GetROSParameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
+    GetROSParameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
+    GetROSParameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
+    GetROSParameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
+    GetROSParameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
     if(g_camera_lidar_queue.m_if_write_res_to_bag)
     {
         g_camera_lidar_queue.init_rosbag_for_recording();

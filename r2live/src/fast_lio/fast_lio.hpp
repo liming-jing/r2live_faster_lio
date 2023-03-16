@@ -90,14 +90,6 @@ extern std::shared_ptr<ImuProcess> g_imu_process;
 extern double g_lidar_star_tim;
 
 extern std::string getSystemTime();
-// {
-//     FILE *fp = NULL;
-//     time_t timep;
-//     char name[256] = {0};
-//     time(&timep);//获取从1970至今过了多少秒，存入time_t类型的timep
-//     strftime(name, sizeof(name), "%Y_%m_%d_%H_%M_%S",localtime(&timep)); 
-//     return name;
-// }
 
 class Fast_lio
 {
@@ -272,37 +264,6 @@ public:
         intensity = intensity - std::floor(intensity);
 
         int reflection_map = intensity * 10000;
-
-        // //std::cout<<"DEBUG reflection_map "<<reflection_map<<std::endl;
-
-        // if (reflection_map < 30)
-        // {
-        //     int green = (reflection_map * 255 / 30);
-        //     po->r = 0;
-        //     po->g = green & 0xff;
-        //     po->b = 0xff;
-        // }
-        // else if (reflection_map < 90)
-        // {
-        //     int blue = (((90 - reflection_map) * 255) / 60);
-        //     po->r = 0x0;
-        //     po->g = 0xff;
-        //     po->b = blue & 0xff;
-        // }
-        // else if (reflection_map < 150)
-        // {
-        //     int red = ((reflection_map-90) * 255 / 60);
-        //     po->r = red & 0xff;
-        //     po->g = 0xff;
-        //     po->b = 0x0;
-        // }
-        // else
-        // {
-        //     int green = (((255-reflection_map) * 255) / (255-150));
-        //     po->r = 0xff;
-        //     po->g = green & 0xff;
-        //     po->b = 0;
-        // }
     }
 
     int cube_ind(const int &i, const int &j, const int &k)
@@ -726,8 +687,6 @@ public:
 
         lidar_buffer.pop_front();
         lidar_pushed = false;
-        // if (meas.imu.empty()) return false;
-        // std::cout<<"[IMU Sycned]: "<<imu_time<<" "<<lidar_end_time<<std::endl;
         return true;
     }
 
@@ -745,22 +704,22 @@ public:
         sub_imu = nh.subscribe(imu_topic, 2000000, &Fast_lio::imu_cbk, this, ros::TransportHints().tcpNoDelay());
         sub_pcl = nh.subscribe("/laser_cloud_flat", 2000000, &Fast_lio::feat_points_cbk, this, ros::TransportHints().tcpNoDelay());
 
-        get_ros_parameter(nh, "fast_lio/dense_map_enable", dense_map_en, true);
-        get_ros_parameter(nh, "fast_lio/lidar_time_delay", m_lidar_time_delay, 0.0);
-        get_ros_parameter(nh, "fast_lio/max_iteration", NUM_MAX_ITERATIONS, 4);
+        GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en, true);
+        GetROSParameter(nh, "fast_lio/lidar_time_delay", m_lidar_time_delay, 0.0);
+        GetROSParameter(nh, "fast_lio/max_iteration", NUM_MAX_ITERATIONS, 4);
         ros::param::get("fast_lio/map_file_path", map_file_path);
-        // get_ros_parameter(nh, "fast_lio/map_file_path", map_file_path, "./");
-        get_ros_parameter(nh, "fast_lio/fov_degree", fov_deg, 70.00);
-        get_ros_parameter(nh, "fast_lio/filter_size_corner", filter_size_corner_min, 0.4);
-        get_ros_parameter(nh, "fast_lio/filter_size_surf", filter_size_surf_min, 0.4);
-        get_ros_parameter(nh, "fast_lio/filter_size_surf_z", filter_size_surf_min_z, 0.4);
-        get_ros_parameter(nh, "fast_lio/filter_size_map", filter_size_map_min, 0.4);
-        get_ros_parameter(nh, "fast_lio/cube_side_length", cube_len, 100.0);
-        get_ros_parameter(nh, "fast_lio/maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 3.0);
-        get_ros_parameter(nh, "fast_lio/maximum_res_dis", m_maximum_res_dis, 3.0);
-        get_ros_parameter(nh, "fast_lio/planar_check_dis", m_planar_check_dis, 0.05);
-        get_ros_parameter(nh, "fast_lio/long_rang_pt_dis", m_long_rang_pt_dis, 50.0);
-        get_ros_parameter(nh, "fast_lio/publish_feature_map", m_if_publish_feature_map, false);
+        // GetROSParameter(nh, "fast_lio/map_file_path", map_file_path, "./");
+        GetROSParameter(nh, "fast_lio/fov_degree", fov_deg, 70.00);
+        GetROSParameter(nh, "fast_lio/filter_size_corner", filter_size_corner_min, 0.4);
+        GetROSParameter(nh, "fast_lio/filter_size_surf", filter_size_surf_min, 0.4);
+        GetROSParameter(nh, "fast_lio/filter_size_surf_z", filter_size_surf_min_z, 0.4);
+        GetROSParameter(nh, "fast_lio/filter_size_map", filter_size_map_min, 0.4);
+        GetROSParameter(nh, "fast_lio/cube_side_length", cube_len, 100.0);
+        GetROSParameter(nh, "fast_lio/maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 3.0);
+        GetROSParameter(nh, "fast_lio/maximum_res_dis", m_maximum_res_dis, 3.0);
+        GetROSParameter(nh, "fast_lio/planar_check_dis", m_planar_check_dis, 0.05);
+        GetROSParameter(nh, "fast_lio/long_rang_pt_dis", m_long_rang_pt_dis, 50.0);
+        GetROSParameter(nh, "fast_lio/publish_feature_map", m_if_publish_feature_map, false);
         printf_line;
         featsFromMap = boost::make_shared<PointCloudXYZI>();
         cube_points_add = boost::make_shared<PointCloudXYZI>();
@@ -838,7 +797,7 @@ public:
 
         ros::Rate rate(5000);
         bool status = ros::ok();
-        g_camera_lidar_queue.m_liar_frame_buf = &lidar_buffer;
+        g_camera_lidar_queue.m_lidar_frame_buf = &lidar_buffer;
         while (ros::ok())
         {
             if (flg_exit)

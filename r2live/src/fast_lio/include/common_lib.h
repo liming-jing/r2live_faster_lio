@@ -56,7 +56,7 @@ static const Eigen::Vector3f Zero3f(0, 0, 0);
 static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 
 template <typename T>
-T get_ros_parameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
+T GetROSParameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
 {
     nh.param<T>(parameter_name.c_str(), parameter, default_val);
     // ENABLE_SCREEN_PRINTF;
@@ -148,7 +148,7 @@ struct Camera_Lidar_queue
     int m_if_dump_log = 1;
     rosbag::Bag m_bag_for_record;
 
-    std::deque<sensor_msgs::PointCloud2::ConstPtr> *m_liar_frame_buf = nullptr;
+    std::deque<sensor_msgs::PointCloud2::ConstPtr> *m_lidar_frame_buf = nullptr;
 
     void init_rosbag_for_recording()
     {
@@ -204,9 +204,9 @@ struct Camera_Lidar_queue
 
     double get_lidar_front_time()
     {
-        if (m_liar_frame_buf != nullptr && m_liar_frame_buf->size())
+        if (m_lidar_frame_buf != nullptr && m_lidar_frame_buf->size())
         {
-            return m_liar_frame_buf->front()->header.stamp.toSec() + 0.1;
+            return m_lidar_frame_buf->front()->header.stamp.toSec() + 0.1;
         }
         else
         {
