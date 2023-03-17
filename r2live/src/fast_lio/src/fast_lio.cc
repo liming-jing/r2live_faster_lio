@@ -14,6 +14,7 @@ FastLio::FastLio(ros::NodeHandle& nh)
 
     Init(nh);
 
+    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_);
     imu_process_ = std::make_shared<ImuProcess>();
     thread_process_ = std::thread(&FastLio::Process, this);
 }
@@ -190,6 +191,24 @@ int FastLio::Process()
 
          /*** Segment the map in lidar FOV ***/
         LasermapFovSegment();
+
+        downsize_filter_surf_.setInputCloud(feats_undistort_);
+        downsize_filter_surf_.filter(*feats_down_);
+
+        if (!flg_map_inited_)
+        {
+            point_cloud_map_ptr_->InitPointCloudMap(feats_down_);
+            flg_map_inited_ = true;
+            continue;
+        }
+
+        if (point_cloud_map_ptr_->GetPointsNumFromMap() < 5)
+        {
+            std::cout << "Insufficient map points, discard update!" << std::endl;
+            continue;
+        }
+
+        
     }
 }
 
@@ -474,17 +493,11 @@ void FastLio::LasermapFovSegment()
     double readd_begin = omp_get_wtime();
 
     if (cub_needrm_.size() > 0)
-        ikdtree_.Delete_Point_Boxes(cub_needrm_);
-    delete_box_time_ = omp_get_wtime() - readd_begin;
-    // s_plot4.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
+        point_cloud_map_ptr_->DeletePointBoxes(cub_needrm_);
     if (cub_needad_.size() > 0)
-        ikdtree_.Add_Point_Boxes(cub_needad_);
-    readd_box_time_ = omp_get_wtime() - readd_begin - delete_box_time_;
-    // s_plot5.push_back(omp_get_wtime() - t_begin); t_begin = omp_get_wtime();
+        point_cloud_map_ptr_->AddPointBoxes(cub_needad_);
     if (cube_points_add_->points.size() > 0)
-        ikdtree_.Add_Points(cube_points_add_->points, true);
-    readd_time_ = omp_get_wtime() - readd_begin - delete_box_time_ - readd_box_time_;
-    // s_plot6.push_back(omp_get_wtime() - t_begin); 
+        point_cloud_map_ptr_->AddPoints(cube_points_add_);
 }
 
 int CubeInd(const int &i, const int &j, const int &k)

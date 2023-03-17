@@ -13,7 +13,6 @@
 #include <Eigen/Core>
 #include <opencv/cv.h>
 #include <common_lib.h>
-#include <kd_tree/ikd_Tree.h>
 #include "IMU_Processing.hpp"
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -29,6 +28,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/Vector3.h>
+#include "pointcloud_map.h"
 
 #define MAXN 360000
 
@@ -98,6 +98,7 @@ private:
     double last_timestamp_lidar_ = -1;
     double lidar_end_time_ = 0.0;
     bool flg_reset_ = false;
+    bool flg_map_inited_ = false;
     bool lidar_pushed_ = false;
     bool flg_EKF_inited_ = false;
     double cube_len_ = 0.0;
@@ -146,7 +147,7 @@ private:
     bool flg_exit_ = false;
     std::thread thread_process_;
 
-    KD_TREE ikdtree_;
+    std::shared_ptr<PointCloudMap> point_cloud_map_ptr_;
 
     std::string imu_topic_;
     ros::Publisher pub_laser_cloud_full_res_;
