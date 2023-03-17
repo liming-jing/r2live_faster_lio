@@ -58,3 +58,14 @@ int PointCloudMap::GetPointsNumFromMap()
         return 0;
     }
 }
+
+void PointCloudMap::NearestSearch(PointType & point, int k_nearest, PointVector& points_near, std::vector<float>& point_search_sq_dis)
+{
+     if (ikdtree_.Root_Node != nullptr)
+    {
+       ikdtree_.Nearest_Search(point, k_nearest, points_near, point_search_sq_dis);
+    }
+    else {
+        std::cerr << "Ikdtree not initialized" << std::endl;
+    }
+}

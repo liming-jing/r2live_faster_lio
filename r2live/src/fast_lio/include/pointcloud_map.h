@@ -13,6 +13,7 @@ class PointCloudMap{
         void AddPointBoxes(std::vector<BoxPointType>& cub_needad);
         void AddPoints(PointCloudXYZI::Ptr cube_points_add);
         int GetPointsNumFromMap();
+        void NearestSearch(PointType & point, int num, PointVector& points_near, std::vector<float>& point_search_sq_dis);
 
 
     private:

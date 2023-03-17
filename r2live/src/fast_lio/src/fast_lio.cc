@@ -2,25 +2,22 @@
 
 FastLio::FastLio(ros::NodeHandle& nh)
 {
+    Init(nh);
+
     pub_laser_cloud_full_res_ = nh.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
     pub_laser_cloud_effect_ = nh.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100);
     pub_laser_cloud_map_ = nh.advertise<sensor_msgs::PointCloud2>("/Laser_map", 100);
     pub_odom_aft_aapped_ = nh.advertise<nav_msgs::Odometry>("/aft_mapped_to_init", 10);
     pub_path_ = nh.advertise<nav_msgs::Path>("/path", 10);
 
-    nh.param<std::string>("r2live/imu_topic", imu_topic_, "/livox/imu");
     sub_imu_ = nh.subscribe(imu_topic_, 2000000, &FastLio::ImuCbk, this, ros::TransportHints().tcpNoDelay());
     sub_pcl_ = nh.subscribe("/laser_cloud_flat", 2000000, &FastLio::FeatPointsCbk, this, ros::TransportHints().tcpNoDelay());
 
-    Init(nh);
-
-    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_);
-    imu_process_ = std::make_shared<ImuProcess>();
-    thread_process_ = std::thread(&FastLio::Process, this);
 }
 
 void FastLio::Init(ros::NodeHandle& nh)
 {
+    nh.param<std::string>("r2live/imu_topic", imu_topic_, "/livox/imu");
     GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en_, true);
     GetROSParameter(nh, "fast_lio/lidar_time_delay", lidar_time_delay_, 0.0);
     GetROSParameter(nh, "fast_lio/max_iteration", NUM_MAX_ITERATIONS, 4);
@@ -39,8 +36,6 @@ void FastLio::Init(ros::NodeHandle& nh)
 
     feats_undistort_.reset(new PointCloudXYZI());
     feats_down_.reset(new PointCloudXYZI());
-    laser_cloud_ori_.reset(new PointCloudXYZI());
-    coeff_sel_.reset(new PointCloudXYZI());
 
     feats_from_map_.reset(new PointCloudXYZI());
     cube_points_add_.reset(new PointCloudXYZI());
@@ -52,6 +47,17 @@ void FastLio::Init(ros::NodeHandle& nh)
 
     downsize_filter_map_.setLeafSize(filter_size_map_min_, filter_size_map_min_, filter_size_map_min_);
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
+
+    lio_core_ptr_ = std::make_shared<LioCore>(NUM_MAX_ITERATIONS,
+                                             maximum_pt_kdtree_dis_,
+                                             planar_check_dis_,
+                                             long_rang_pt_dis_,
+                                             maximum_res_dis_);
+    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_);
+    lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
+
+    imu_process_ = std::make_shared<ImuProcess>();
+    thread_process_ = std::thread(&FastLio::Process, this);
 }
 
 void FastLio::ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in)

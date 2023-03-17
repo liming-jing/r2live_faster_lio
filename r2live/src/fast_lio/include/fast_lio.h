@@ -29,6 +29,7 @@
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/Vector3.h>
 #include "pointcloud_map.h"
+#include "lio_core.h"
 
 #define MAXN 360000
 
@@ -123,8 +124,6 @@ private:
 
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;
-    PointCloudXYZI::Ptr laser_cloud_ori_;
-    PointCloudXYZI::Ptr coeff_sel_;
 
     PointCloudXYZI::Ptr feats_from_map_; 
     PointCloudXYZI::Ptr cube_points_add_;
@@ -148,6 +147,7 @@ private:
     std::thread thread_process_;
 
     std::shared_ptr<PointCloudMap> point_cloud_map_ptr_;
+    std::shared_ptr<LioCore> lio_core_ptr_;
 
     std::string imu_topic_;
     ros::Publisher pub_laser_cloud_full_res_;

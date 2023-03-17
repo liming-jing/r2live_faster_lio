@@ -1050,6 +1050,8 @@ public:
                             pca_time += omp_get_wtime() - pca_start;
                         }
 
+                        /******************** 上面整理完成**************************************************/
+
                         double total_residual = 0.0;
                         laserCloudSelNum = 0;
 
