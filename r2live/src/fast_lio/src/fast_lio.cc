@@ -214,7 +214,7 @@ int FastLio::Process()
             continue;
         }
 
-        
+        lio_core_ptr_->SetEKFFlg(flg_EKF_inited_);
     }
 }
 
