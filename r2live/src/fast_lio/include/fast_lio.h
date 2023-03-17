@@ -65,6 +65,16 @@ private:
     void FeatPointsCbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in);
     bool SyncPackages(MeasureGroup &meas);
+
+    void PublishData(PointCloudXYZI::Ptr feats_undistort, PointCloudXYZI::Ptr feats_down);
+
+private:
+    void PublishCurrentFrame(PointCloudXYZI::Ptr feats_undistort, PointCloudXYZI::Ptr feats_down);
+    void PublishEffePoints();
+    void PublishMap();
+    void PublishOdom();
+    void PublishTFTransform();
+    void PublishPath();
     
 private:
     template <typename T>
@@ -78,8 +88,8 @@ private:
     }
 
     int CubeInd(const int &i, const int &j, const int &k);
-
-
+    void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
+    void ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur);
 private:
     // system parameter
     bool dense_map_en_;
@@ -128,13 +138,12 @@ private:
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;
 
-    PointCloudXYZI::Ptr feats_from_map_; 
     PointCloudXYZI::Ptr cube_points_add_;
-    PointCloudXYZI::Ptr laser_cloud_full_res2_;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr laser_cloud_full_res_color_;
 
     Eigen::Vector3f x_axis_point_body_; //(LIDAR_SP_LEN, 0.0, 0.0);
     Eigen::Vector3f x_axis_point_world_; //(LIDAR_SP_LEN, 0.0, 0.0);
+
+    nav_msgs::Path path_;
 
 private:
     std::mutex mutex_lio_process_;

@@ -34,13 +34,15 @@ void FastLio::Init(ros::NodeHandle& nh)
     GetROSParameter(nh, "fast_lio/long_rang_pt_dis", long_rang_pt_dis_, 50.0);
     GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
 
+
+    path_.header.stamp = ros::Time::now();
+    path_.header.frame_id = "/world";
+
+
     feats_undistort_.reset(new PointCloudXYZI());
     feats_down_.reset(new PointCloudXYZI());
 
-    feats_from_map_.reset(new PointCloudXYZI());
     cube_points_add_.reset(new PointCloudXYZI());
-    laser_cloud_full_res_color_.reset(new pcl::PointCloud<pcl::PointXYZI>());
-    laser_cloud_full_res2_.reset(new PointCloudXYZI());
 
     x_axis_point_body_ = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
     x_axis_point_world_ = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
@@ -225,6 +227,7 @@ int FastLio::Process()
         }
 
         point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray);
+        PublishData(feats_undistort_, feats_down_);
     }
 }
 
@@ -412,7 +415,6 @@ void FastLio::LasermapFovSegment()
     }
 
     cube_points_add_->clear();
-    feats_from_map_->clear();
     memset(now_inFOV, 0, sizeof(now_inFOV));
     copy_time_ = omp_get_wtime() - t_begin;
     double fov_check_begin = omp_get_wtime();
@@ -521,3 +523,157 @@ int FastLio::CubeInd(const int &i, const int &j, const int &k)
     return (i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k);
 }
 
+void FastLio::RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po)
+{
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
+
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
+    po->intensity = pi->intensity;
+
+    float intensity = pi->intensity;
+    intensity = intensity - std::floor(intensity);
+
+    int reflection_map = intensity * 10000;
+}
+
+
+void FastLio::PublishData(PointCloudXYZI::Ptr feats_undistort, PointCloudXYZI::Ptr feats_down)
+{
+    // 1. 发布当前帧点云
+    PublishCurrentFrame(feats_undistort, feats_down);
+    // 2. 发布有效点云
+    PublishEffePoints();
+    // 3. 发布地图
+    PublishMap();
+    // 4. 发布里程计
+    PublishOdom();
+    // 5. tf变换
+    PublishTFTransform();
+    // 6. 发布路径
+    PublishPath();
+    // 7. 向bag包中写数据
+}
+
+
+void FastLio::PublishCurrentFrame(PointCloudXYZI::Ptr feats_undistort, PointCloudXYZI::Ptr feats_down)
+{
+    PointCloudXYZI::Ptr cur_frame_points(new PointCloudXYZI());
+    cur_frame_points->clear();
+    *cur_frame_points = dense_map_en_ ? (*feats_undistort) : (*feats_down);
+
+    int points_size = cur_frame_points->points.size();
+
+    pcl::PointXYZI temp_point;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cur_color_points(new pcl::PointCloud<pcl::PointXYZI>());
+    cur_color_points->clear();
+
+    for (int i = 0; i < points_size; i++)
+    {
+        RGBpointBodyToWorld(&cur_frame_points->points[i], &temp_point);
+        cur_color_points->push_back(temp_point);
+    }
+
+    sensor_msgs::PointCloud2 msg;
+    pcl::toROSMsg(*cur_color_points, msg);
+    msg.header.stamp.fromSec(Measures.lidar_end_time);
+    msg.header.frame_id = "world";       // world; camera_init
+    pub_laser_cloud_full_res_.publish(msg);
+}
+
+void FastLio::PublishEffePoints()
+{
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cur_color_points(new pcl::PointCloud<pcl::PointXYZI>());
+    PointCloudXYZI::Ptr laserCloudOri = lio_core_ptr_->GetLaserCloudOri();
+
+    int points_size = laserCloudOri->points.size();
+
+    pcl::PointXYZI temp_point;
+    for (int i = 0; i < points_size; i++)
+    {
+        RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
+        cur_color_points->push_back(temp_point);
+    }
+
+    sensor_msgs::PointCloud2 msg;
+    pcl::toROSMsg(*cur_color_points, msg);
+    msg.header.stamp.fromSec(Measures.lidar_end_time);
+    msg.header.frame_id = "world";       // world; camera_init
+    pub_laser_cloud_effect_.publish(msg);
+}
+
+void FastLio::PublishMap()
+{
+    PointCloudXYZI::Ptr feats_from_map = point_cloud_map_ptr_->GetFeatureMap();
+    sensor_msgs::PointCloud2 laserCloudMap;
+    pcl::toROSMsg(*feats_from_map, laserCloudMap);
+
+    laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); //ros::Time().fromSec(last_timestamp_lidar);
+    laserCloudMap.header.frame_id = "world";
+    pub_laser_cloud_map_.publish(laserCloudMap);
+}
+
+
+void FastLio::PublishOdom()
+{
+    auto euler_cur = RotMtoEuler(g_lio_state.rot_end);
+    nav_msgs::Odometry odomAftMapped;
+    ChangeFormatData(odomAftMapped, euler_cur);
+    pub_odom_aft_aapped_.publish(odomAftMapped);
+}
+
+void FastLio::PublishTFTransform()
+{
+    auto euler_cur = RotMtoEuler(g_lio_state.rot_end);
+    nav_msgs::Odometry odomAftMapped;
+    ChangeFormatData(odomAftMapped, euler_cur);
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    tf::Quaternion q;
+    transform.setOrigin(tf::Vector3(odomAftMapped.pose.pose.position.x,
+                                    odomAftMapped.pose.pose.position.y,
+                                    odomAftMapped.pose.pose.position.z));
+    q.setW(odomAftMapped.pose.pose.orientation.w);
+    q.setX(odomAftMapped.pose.pose.orientation.x);
+    q.setY(odomAftMapped.pose.pose.orientation.y);
+    q.setZ(odomAftMapped.pose.pose.orientation.z);
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec(Measures.lidar_end_time), "world", "/aft_mapped"));
+}
+
+
+void FastLio::ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur)
+{
+    geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
+    odomAftMapped.header.frame_id = "world";
+    odomAftMapped.child_frame_id = "/aft_mapped";
+    odomAftMapped.header.stamp = ros::Time::now(); //ros::Time().fromSec(last_timestamp_lidar);
+    odomAftMapped.pose.pose.orientation.x = geoQuat.x;
+    odomAftMapped.pose.pose.orientation.y = geoQuat.y;
+    odomAftMapped.pose.pose.orientation.z = geoQuat.z;
+    odomAftMapped.pose.pose.orientation.w = geoQuat.w;
+    odomAftMapped.pose.pose.position.x = g_lio_state.pos_end(0);
+    odomAftMapped.pose.pose.position.y = g_lio_state.pos_end(1);
+    odomAftMapped.pose.pose.position.z = g_lio_state.pos_end(2);
+}
+
+void FastLio::PublishPath()
+{
+    auto euler_cur = RotMtoEuler(g_lio_state.rot_end);
+    geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
+    geometry_msgs::PoseStamped msg_body_pose;
+    msg_body_pose.header.stamp = ros::Time::now();
+    msg_body_pose.header.frame_id = "/camera_odom_frame";
+    msg_body_pose.pose.position.x = g_lio_state.pos_end(0);
+    msg_body_pose.pose.position.y = g_lio_state.pos_end(1);
+    msg_body_pose.pose.position.z = g_lio_state.pos_end(2);
+    msg_body_pose.pose.orientation.x = geoQuat.x;
+    msg_body_pose.pose.orientation.y = geoQuat.y;
+    msg_body_pose.pose.orientation.z = geoQuat.z;
+    msg_body_pose.pose.orientation.w = geoQuat.w;
+    msg_body_pose.header.frame_id = "world";
+    path_.poses.push_back(msg_body_pose);
+    pub_path_.publish(path_);
+}

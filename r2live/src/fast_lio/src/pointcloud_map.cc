@@ -119,3 +119,13 @@ void PointCloudMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, PointCloudXYZI::
     }
     ikdtree_.Add_Points(cloud->points, true);
 }
+
+PointCloudXYZI::Ptr PointCloudMap::GetFeatureMap()
+{
+    PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
+    PointVector().swap(ikdtree_.PCL_Storage);
+    ikdtree_.flatten(ikdtree_.Root_Node, ikdtree_.PCL_Storage, NOT_RECORD);
+    featsFromMap->clear();
+    featsFromMap->points = ikdtree_.PCL_Storage;
+    return featsFromMap;
+}

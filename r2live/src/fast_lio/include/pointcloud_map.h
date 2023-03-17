@@ -18,10 +18,10 @@ class PointCloudMap{
         void AddPoints(PointCloudXYZI::Ptr cube_points_add);
         int GetPointsNumFromMap();
         void NearestSearch(PointType & point, int num, PointVector& points_near, std::vector<float>& point_search_sq_dis);
-
         void AddNewPointCloud(PointCloudXYZI::Ptr cloud, PointCloudXYZI::Ptr featsArray[]);
-
         void SetCenWidthHeightDepth(int width, int height, int depth);
+
+        PointCloudXYZI::Ptr GetFeatureMap();
     private:
         void Init();
 
