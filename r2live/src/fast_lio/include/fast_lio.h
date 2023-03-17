@@ -57,10 +57,6 @@ private:
     void Init(ros::NodeHandle& nh);
     void SigHanle(int sig);
     void PointBodyToWorld(PointType const *const pi, PointType *const po);
-    void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
-    int CubeInd(const int &i, const int &j, const int &k);
-    bool CenterinFOV(Eigen::Vector3f cube_p);
-    bool CornerinFOV(Eigen::Vector3f cube_p);
     void LasermapFovSegment();
     void FeatPointsCbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in);
@@ -88,7 +84,10 @@ private:
     }
 
     int CubeInd(const int &i, const int &j, const int &k);
+    bool CenterinFOV(Eigen::Vector3f cube_p);
+    bool CornerinFOV(Eigen::Vector3f cube_p);
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
+    void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
     void ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur);
 private:
     // system parameter
@@ -102,7 +101,6 @@ private:
     double filter_size_surf_min_z_;
     double filter_size_map_min_;
     double first_lidar_time_ = 0;
-    double cube_len_;
     double maximum_pt_kdtree_dis_;
     double maximum_res_dis_;
     double planar_check_dis_;
@@ -116,6 +114,8 @@ private:
     bool lidar_pushed_ = false;
     bool flg_EKF_inited_ = false;
     double cube_len_ = 0.0;
+    double HALF_FOV_COS = 0.0;
+    double FOV_DEG = 0.0;
     double T1[MAXN], T2[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN];
     int time_log_counter = 0;
     int FOV_RANGE = 4;
@@ -150,7 +150,6 @@ private:
     std::mutex mtx_buffer_;
     std::condition_variable sig_buffer_;
     std::shared_ptr<ImuProcess> imu_process_;
-    std::string imu_topic_;
 
     std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer_;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_;

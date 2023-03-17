@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(r2live)
 
-# ADD_COMPILE_OPTIONS(-std=c++14 )
-# set(CMAKE_BUILD_TYPE "Release")
-# set(CMAKE_CXX_FLAGS "-std=c++14")
-# #-DEIGEN_USE_MKL_ALL")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++17 -O3 -w")
@@ -14,8 +8,6 @@ set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# gcc 兼容问题
-# ADD_DEFINITIONS(-fpermissive)
 
 add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
@@ -95,6 +87,10 @@ add_executable(r2live
     src/fast_lio/include/kd_tree/ikd_Tree.cpp
     src/fast_lio/include/FOV_Checker/FOV_Checker.cpp 
     src/fast_lio/IMU_Processing.cpp
+
+    src/fast_lio/src/fast_lio.cc 
+    src/fast_lio/src/lio_core.cc 
+    src/fast_lio/src/pointcloud_map.cc 
     )
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) 

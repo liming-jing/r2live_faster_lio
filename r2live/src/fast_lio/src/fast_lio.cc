@@ -39,6 +39,9 @@ void FastLio::Init(ros::NodeHandle& nh)
     path_.header.frame_id = "/world";
 
 
+    FOV_DEG = fov_deg_ + 10;
+    HALF_FOV_COS = std::cos((fov_deg_ + 10.0) * 0.5 * PI_M / 180.0);
+
     feats_undistort_.reset(new PointCloudXYZI());
     feats_down_.reset(new PointCloudXYZI());
 
@@ -223,12 +226,14 @@ int FastLio::Process()
         PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI(*feats_down_));
         for (int i = 0; i < points_size; i++)
         {
-            PointBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
+            PointTypeBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
         }
 
         point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray);
         PublishData(feats_undistort_, feats_down_);
+        rate.sleep();
     }
+    return 0;
 }
 
 void FastLio::LasermapFovSegment()
@@ -523,6 +528,35 @@ int FastLio::CubeInd(const int &i, const int &j, const int &k)
     return (i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k);
 }
 
+bool FastLio::CenterinFOV(Eigen::Vector3f cube_p)
+{
+    Eigen::Vector3f dis_vec = g_lio_state.pos_end.cast<float>() - cube_p;
+    float squaredSide1 = dis_vec.transpose() * dis_vec;
+
+    if (squaredSide1 < 0.4 * cube_len_ * cube_len_)
+        return true;
+
+    dis_vec = x_axis_point_world_.cast<float>() - cube_p;
+    float squaredSide2 = dis_vec.transpose() * dis_vec;
+
+    float ang_cos = fabs(squaredSide1 <= 3) ? 1.0 : (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+
+    return ((ang_cos > HALF_FOV_COS) ? true : false);
+}
+
+bool FastLio::CornerinFOV(Eigen::Vector3f cube_p)
+{
+    Eigen::Vector3f dis_vec = g_lio_state.pos_end.cast<float>() - cube_p;
+    float squaredSide1 = dis_vec.transpose() * dis_vec;
+
+    dis_vec = x_axis_point_world_.cast<float>() - cube_p;
+    float squaredSide2 = dis_vec.transpose() * dis_vec;
+
+    float ang_cos = fabs(squaredSide1 <= 3) ? 1.0 : (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
+
+    return ((ang_cos > HALF_FOV_COS) ? true : false);
+}
+
 void FastLio::RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
@@ -537,6 +571,17 @@ void FastLio::RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *con
     intensity = intensity - std::floor(intensity);
 
     int reflection_map = intensity * 10000;
+}
+
+void FastLio::PointTypeBodyToWorld(PointType const *const pi, PointType *const po)
+{
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
+
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
+    po->intensity = pi->intensity;
 }
 
 

@@ -22,7 +22,7 @@ class LioCore{
         void SetEKFFlg(bool flg_EKF_inited);
         void SetPointCloudMap(std::shared_ptr<PointCloudMap> point_cloud_map);
         void Update(PointCloudXYZI::Ptr current_frame);
-        inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_};
+        inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;};
     private:
         void Init();
         void ReSetData(PointCloudXYZI::Ptr current_frame);
