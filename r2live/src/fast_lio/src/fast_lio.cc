@@ -53,7 +53,7 @@ void FastLio::Init(ros::NodeHandle& nh)
                                              planar_check_dis_,
                                              long_rang_pt_dis_,
                                              maximum_res_dis_);
-    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_);
+    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_, cube_len_);
     lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
 
     imu_process_ = std::make_shared<ImuProcess>();
@@ -215,6 +215,16 @@ int FastLio::Process()
         }
 
         lio_core_ptr_->SetEKFFlg(flg_EKF_inited_);
+        lio_core_ptr_->Update(feats_down_);
+
+        int points_size = feats_down_->points.size();
+        PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI(*feats_down_));
+        for (int i = 0; i < points_size; i++)
+        {
+            PointBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
+        }
+
+        point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray);
     }
 }
 
@@ -506,7 +516,8 @@ void FastLio::LasermapFovSegment()
         point_cloud_map_ptr_->AddPoints(cube_points_add_);
 }
 
-int CubeInd(const int &i, const int &j, const int &k)
+int FastLio::CubeInd(const int &i, const int &j, const int &k)
 {
     return (i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k);
 }
+

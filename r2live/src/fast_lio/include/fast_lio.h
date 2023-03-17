@@ -50,6 +50,9 @@ extern double g_lidar_star_tim;
 class FastLio {
 public:
     FastLio(ros::NodeHandle& nh);
+     ~FastLio(){};
+
+private:
     int Process();
     void Init(ros::NodeHandle& nh);
     void SigHanle(int sig);
@@ -62,7 +65,7 @@ public:
     void FeatPointsCbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in);
     bool SyncPackages(MeasureGroup &meas);
-     ~FastLio(){};
+    
 private:
     template <typename T>
     void PointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)

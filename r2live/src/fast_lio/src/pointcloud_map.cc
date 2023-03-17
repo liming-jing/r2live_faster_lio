@@ -1,9 +1,19 @@
 #include "pointcloud_map.h"
 
 
-PointCloudMap::PointCloudMap(double filter_size_map_min) 
+PointCloudMap::PointCloudMap(double filter_size_map_min, double cube_len) 
 {
+    // Init();
     filter_size_map_min_ = filter_size_map_min;
+    cube_len_ = cube_len;
+}
+
+void PointCloudMap::Init()
+{
+    // for (int i = 0; i < kLaserCloudNum; i++)
+    // {
+    //     featsArray_[i].reset(new PointCloudXYZI());
+    // }
 }
 
 void PointCloudMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
@@ -68,4 +78,44 @@ void PointCloudMap::NearestSearch(PointType & point, int k_nearest, PointVector&
     else {
         std::cerr << "Ikdtree not initialized" << std::endl;
     }
+}
+
+void PointCloudMap::SetCenWidthHeightDepth(int width, int height, int depth)
+{
+    laser_cloud_cen_width_ = width;
+    laser_cloud_cen_height_ = height;
+    laser_cloud_cen_depth_ = depth;
+}
+
+void PointCloudMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, PointCloudXYZI::Ptr featsArray[])
+{
+    PointVector points_history;
+    ikdtree_.acquire_removed_points(points_history);
+
+    memset(cube_updated_, 0, sizeof(cube_updated_));
+
+    for (int i = 0; i < points_history.size(); i++)
+    {
+        PointType &pointSel = points_history[i];
+
+        int cubeI = int((pointSel.x + 0.5 * cube_len_) / cube_len_) + laser_cloud_cen_width_;
+        int cubeJ = int((pointSel.y + 0.5 * cube_len_) / cube_len_) + laser_cloud_cen_height_;
+        int cubeK = int((pointSel.z + 0.5 * cube_len_) / cube_len_) + laser_cloud_cen_depth_;
+
+        if (pointSel.x + 0.5 * cube_len_ < 0)
+            cubeI--;
+        if (pointSel.y + 0.5 * cube_len_ < 0)
+            cubeJ--;
+        if (pointSel.z + 0.5 * cube_len_ < 0)
+            cubeK--;
+
+        if (cubeI >= 0 && cubeI < laser_cloud_cen_width_ &&
+            cubeJ >= 0 && cubeJ < laser_cloud_cen_height_ &&
+            cubeK >= 0 && cubeK < laser_cloud_cen_depth_)
+        {
+            int cubeInd = cubeI + laser_cloud_cen_width_ * cubeJ + laser_cloud_cen_width_ * laser_cloud_cen_height_ * cubeK;
+            featsArray[cubeInd]->push_back(pointSel);
+        }
+    }
+    ikdtree_.Add_Points(cloud->points, true);
 }
