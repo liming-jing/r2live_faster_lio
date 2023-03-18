@@ -26,6 +26,7 @@
 #define ESTIMATE_GRAVITY 0
 
 #define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
+#define printf_func std::cout << __func__ << " " << __LINE__ << std::endl;
 
 #define PI_M (3.14159265358)
 #define G_m_s2 (9.805)     // Gravaty const in GuangDong/China
