@@ -12,7 +12,8 @@
 #include "estimator.h"
 #include "parameters.h"
 #include "utility/visualization.h"
-#include "./fast_lio/fast_lio.hpp"
+// #include "./fast_lio/fast_lio.hpp"
+#include "./fast_lio/include/fast_lio.h"
 #define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
@@ -231,7 +232,7 @@ void unlock_lio(Estimator &estimator)
 {
     if (estimator.m_fast_lio_instance)
     {
-        estimator.m_fast_lio_instance->m_mutex_lio_process.unlock();
+        estimator.m_fast_lio_instance->mutex_lio_process_.unlock();
     }
 }
 
@@ -239,7 +240,7 @@ void lock_lio(Estimator &estimator)
 {
     if (estimator.m_fast_lio_instance)
     {
-        estimator.m_fast_lio_instance->m_mutex_lio_process.lock();
+        estimator.m_fast_lio_instance->mutex_lio_process_.lock();
     }
 }
 
@@ -430,10 +431,6 @@ void process()
 
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
-
-    std::string document_path = "/home/jlm/File/OSCode/ws_r2live/src/r2live/LOG/";
-    std::string odom_file = document_path + "vo_odom_" + sys_time + ".txt";
-    std::string vo_using_time_file = document_path + "vo_using_time_" + sys_time + ".txt";
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
@@ -465,7 +462,7 @@ void process()
                 lock_lio(estimator);
                 t_s.tic();
                 double camera_LiDAR_tim_diff = img_msg->header.stamp.toSec() + g_camera_lidar_queue.m_camera_imu_td - g_lio_state.last_update_time;
-            *p_imu = *(estimator.m_fast_lio_instance->m_imu_process);
+            *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
             }
 
             if ((g_camera_lidar_queue.m_if_lidar_can_start == true) && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))
@@ -571,7 +568,7 @@ void process()
                 esikf_update_valid = true;
                 if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR))
                 {
-                    *p_imu = *(estimator.m_fast_lio_instance->m_imu_process);
+                    *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
                     state_aft_integration = p_imu->imu_preintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
                     estimator.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
                     
@@ -594,8 +591,8 @@ void process()
                     {
                         // esikf_update_valid = false;
                         scope_color(ANSI_COLOR_RED_BOLD);
-                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator.m_fast_lio_instance->first_lidar_time << endl;
-                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator.m_fast_lio_instance->first_lidar_time << endl;
+                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator.m_fast_lio_instance->first_lidar_time_ << endl;
+                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator.m_fast_lio_instance->first_lidar_time_ << endl;
                         cout << "Start dt = " << start_dt << std::setprecision(2) << endl;
                         cout << "Final dt = " << end_dt << std::setprecision(2) << endl;
                         cout << "LiDAR->Image preintegration: " << start_dt << " <--> " << end_dt << endl;
@@ -801,17 +798,17 @@ void process()
             unlock_lio(estimator);
             m_state.lock();
             double whole_t = t_s.toc();
-            printStatistics(estimator, whole_t, vo_using_time_file);
+            printStatistics(estimator, whole_t);
             header = img_msg->header;
             header.frame_id = "world";
   
             if (g_camera_lidar_queue.m_if_have_lidar_data == false)
             {
-                pubOdometry(estimator, header, odom_file);
+                pubOdometry(estimator, header);
             }
             else
             {
-                pub_LiDAR_Odometry(estimator, state_aft_integration, header, odom_file);
+                pub_LiDAR_Odometry(estimator, state_aft_integration, header);
             }
             pubCameraPose(estimator, header);
             pubKeyPoses(estimator, header);
@@ -871,7 +868,7 @@ int main(int argc, char **argv)
     g_camera_lidar_queue.m_if_lidar_can_start = false;
     if (estimator.m_fast_lio_instance == nullptr)
     {
-        estimator.m_fast_lio_instance = new Fast_lio();
+        estimator.m_fast_lio_instance = new FastLio(nh);
     }
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");

@@ -17,7 +17,7 @@
 #include "factor/projection_td_factor.h"
 #include "factor/lidar_prior.hpp"
 
-#include "./fast_lio/fast_lio.hpp"
+#include "./fast_lio/include/fast_lio.h"
 
 #include <unordered_map>
 #include <queue>
@@ -31,7 +31,7 @@ class Estimator
 {
   public:
     Estimator();
-    Fast_lio * m_fast_lio_instance = nullptr;
+    FastLio * m_fast_lio_instance = nullptr;
     void setParameter();
 
     // interface
