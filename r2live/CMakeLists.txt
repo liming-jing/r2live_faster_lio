@@ -95,4 +95,12 @@ add_executable(r2live
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) 
 
+add_library(${PROJECT_NAME}_test SHARED 
+            src/fast_lio/src/parameter_server.cc            
+)
+add_executable(test_app ../test/test_app.cc)
+
+target_link_libraries(test_app ${PROJECT_NAME}_test)
+
+
 
