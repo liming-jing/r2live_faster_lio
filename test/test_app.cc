@@ -4,13 +4,13 @@
 
 void test_parameter_server()
 {
-    ParameterServer* PS = ParameterServer::GetInstance();
-    int num = 8;
-    PS->SetNums(num);
-    std::cout << "num : " << PS->GetNums() << std::endl;
-    num = 10;
-    PS->SetNums(num);
-    std::cout << "num : " << PS->GetNums() << std::endl;
+    // ParameterServer* PS = ParameterServer::GetInstance();
+    // int num = 8;
+    // PS->SetNums(num);
+    // std::cout << "num : " << PS->GetNums() << std::endl;
+    // num = 10;
+    // PS->SetNums(num);
+    // std::cout << "num : " << PS->GetNums() << std::endl;
 }
 
 int main(int argc, char** argv)

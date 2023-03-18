@@ -99,7 +99,6 @@ private:
     bool dense_map_en_;
     double lidar_time_delay_;
     int NUM_MAX_ITERATIONS;
-    std::string map_file_path_;
     double fov_deg_;
     double filter_size_corner_min_;
     double filter_size_surf_min_;

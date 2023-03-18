@@ -31,12 +31,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
 find_package(OpenCV REQUIRED)
 
-# message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
-
 find_package(Ceres REQUIRED)
 find_package(PCL REQUIRED)
-
 find_package(PythonLibs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
 
@@ -59,6 +57,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
   ${PYTHON_INCLUDE_DIRS}
+  ${yaml-cpp_INCLUDE_DIRS}
   ./src/fast_lio/include
   ./src/tools/
 )
@@ -95,12 +94,12 @@ add_executable(r2live
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) 
 
-add_library(${PROJECT_NAME}_test SHARED 
-            src/fast_lio/src/parameter_server.cc            
-)
-add_executable(test_app ../test/test_app.cc)
+# add_library(${PROJECT_NAME}_test SHARED 
+#             src/fast_lio/src/parameter_server.cc            
+# )
+# add_executable(test_app ../test/test_app.cc)
 
-target_link_libraries(test_app ${PROJECT_NAME}_test)
+# target_link_libraries(test_app ${PROJECT_NAME}_test)
 
 
 

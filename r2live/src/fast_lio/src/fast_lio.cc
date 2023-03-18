@@ -21,7 +21,6 @@ void FastLio::Init(ros::NodeHandle& nh)
     GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en_, true);
     GetROSParameter(nh, "fast_lio/lidar_time_delay", lidar_time_delay_, 0.0);
     GetROSParameter(nh, "fast_lio/max_iteration", NUM_MAX_ITERATIONS, 4);
-    ros::param::get("fast_lio/map_file_path", map_file_path_);
     GetROSParameter(nh, "fast_lio/fov_degree", fov_deg_, 70.00);
     GetROSParameter(nh, "fast_lio/filter_size_corner", filter_size_corner_min_, 0.4);
     GetROSParameter(nh, "fast_lio/filter_size_surf", filter_size_surf_min_, 0.4);
