@@ -17,7 +17,7 @@ FastLio::FastLio(ros::NodeHandle& nh)
 
 void FastLio::Init(ros::NodeHandle& nh)
 {
-    nh.param<std::string>("r2live/imu_topic", imu_topic_, "/livox/imu");
+    nh.param<std::string>("imu_topic", imu_topic_, "/livox/imu");
     GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en_, true);
     GetROSParameter(nh, "fast_lio/lidar_time_delay", lidar_time_delay_, 0.0);
     GetROSParameter(nh, "fast_lio/max_iteration", NUM_MAX_ITERATIONS, 4);
@@ -44,8 +44,12 @@ void FastLio::Init(ros::NodeHandle& nh)
 
     feats_undistort_.reset(new PointCloudXYZI());
     feats_down_.reset(new PointCloudXYZI());
-
     cube_points_add_.reset(new PointCloudXYZI());
+
+    for (int i = 0; i < laserCloudNum; i++)
+    {
+        featsArray_[i].reset(new PointCloudXYZI());
+    }
 
     x_axis_point_body_ = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
     x_axis_point_world_ = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
@@ -132,6 +136,7 @@ bool FastLio::SyncPackages(MeasureGroup &meas)
         return false;
     }
 
+    
     double imu_time = imu_buffer_.front()->header.stamp.toSec();
     meas.imu.clear();
     while ((!imu_buffer_.empty()) && (imu_time < lidar_end_time_))
@@ -157,16 +162,24 @@ int FastLio::Process()
         if (flg_exit_) break;
         ros::spinOnce();
 
+        //
         while (g_camera_lidar_queue.if_lidar_can_process() == false)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-
+        //
         std::unique_lock<std::mutex> lock(mutex_lio_process_);
 
-        if (SyncPackages(Measures) == 0) continue;
+        if (SyncPackages(Measures) == false)
+        {
+            continue;
+        }
+
+      
+
         if(g_camera_lidar_queue.m_if_lidar_can_start== 0) continue;
 
+       
         g_lidar_star_tim = first_lidar_time_;
 
         if (flg_reset_)
@@ -175,9 +188,9 @@ int FastLio::Process()
             flg_reset_ = false;
             continue;
         }
-
+        // 
         imu_process_->Process(Measures, g_lio_state, feats_undistort_);
-
+        // 
         g_camera_lidar_queue.g_noise_cov_acc = imu_process_->cov_acc;
         g_camera_lidar_queue.g_noise_cov_gyro = imu_process_->cov_gyr;
         StatesGroup state_propagat(g_lio_state);
@@ -200,9 +213,9 @@ int FastLio::Process()
             flg_EKF_inited_ = true;
         }
 
-         /*** Segment the map in lidar FOV ***/
+        
         LasermapFovSegment();
-
+        
         downsize_filter_surf_.setInputCloud(feats_undistort_);
         downsize_filter_surf_.filter(*feats_down_);
 
@@ -218,9 +231,10 @@ int FastLio::Process()
             std::cout << "Insufficient map points, discard update!" << std::endl;
             continue;
         }
-
+        //
         lio_core_ptr_->SetEKFFlg(flg_EKF_inited_);
         lio_core_ptr_->Update(feats_down_);
+        //
 
         int points_size = feats_down_->points.size();
         PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI(*feats_down_));
@@ -229,8 +243,9 @@ int FastLio::Process()
             PointTypeBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
         }
 
-        point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray);
+        point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray_);
         PublishData(feats_undistort_, feats_down_);
+        //
         rate.sleep();
     }
     return 0;
@@ -240,6 +255,7 @@ void FastLio::LasermapFovSegment()
 {
     int laserCloudValidNum = 0;
 
+    
     PointBodyToWorld(x_axis_point_body_, x_axis_point_world_);
 
     int centerCubeI = int((g_lio_state.pos_end(0) + 0.5 * cube_len_) / cube_len_) + laserCloudCenWidth;
@@ -260,7 +276,7 @@ void FastLio::LasermapFovSegment()
     T2[time_log_counter] = Measures.lidar_beg_time;
     double t_begin = omp_get_wtime();
 
-    // std::cout << "centerCubeIJK: " << centerCubeI << " " << centerCubeJ << " " << centerCubeK << std::endl;
+   
 
     while (centerCubeI < FOV_RANGE + 1)
     {
@@ -270,16 +286,16 @@ void FastLio::LasermapFovSegment()
             {
                 int i = laserCloudWidth - 1;
 
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i - 1, j, k)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i - 1, j, k)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i - 1, j, k)];
                 }
 
-                featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -287,6 +303,7 @@ void FastLio::LasermapFovSegment()
         centerCubeI++;
         laserCloudCenWidth++;
     }
+   
 
     while (centerCubeI >= laserCloudWidth - (FOV_RANGE + 1))
     {
@@ -296,16 +313,16 @@ void FastLio::LasermapFovSegment()
             {
                 int i = 0;
 
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i + 1, j, k)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i + 1, j, k)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i + 1, j, k)];
                 }
 
-                    featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                    featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -315,6 +332,7 @@ void FastLio::LasermapFovSegment()
         laserCloudCenWidth--;
     }
 
+
     while (centerCubeJ < (FOV_RANGE + 1))
     {
         for (int i = 0; i < laserCloudWidth; i++)
@@ -323,16 +341,16 @@ void FastLio::LasermapFovSegment()
             {
                 int j = laserCloudHeight - 1;
 
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i, j - 1, k)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i, j - 1, k)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i, j - 1, k)];
                 }
 
-                featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -349,16 +367,16 @@ void FastLio::LasermapFovSegment()
             for (int k = 0; k < laserCloudDepth; k++)
             {
                 int j = 0;
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i, j + 1, k)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i, j + 1, k)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i, j + 1, k)];
                 }
 
-                featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -375,16 +393,16 @@ void FastLio::LasermapFovSegment()
             for (int j = 0; j < laserCloudHeight; j++)
             {
                 int k = laserCloudDepth - 1;
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i, j, k - 1)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i, j, k - 1)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i, j, k - 1)];
                 }
 
-                featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -401,16 +419,16 @@ void FastLio::LasermapFovSegment()
             for (int j = 0; j < laserCloudHeight; j++)
             {
                 int k = 0;
-                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray[CubeInd(i, j, k)];
+                PointCloudXYZI::Ptr laserCloudCubeSurfPointer = featsArray_[CubeInd(i, j, k)];
                 last_inFOV_flag = _last_inFOV[cube_index];
 
                 for (; i >= 1; i--)
                 {
-                    featsArray[CubeInd(i, j, k)] = featsArray[CubeInd(i, j, k + 1)];
+                    featsArray_[CubeInd(i, j, k)] = featsArray_[CubeInd(i, j, k + 1)];
                     _last_inFOV[CubeInd(i, j, k)] = _last_inFOV[CubeInd(i, j, k + 1)];
                 }
 
-                featsArray[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
+                featsArray_[CubeInd(i, j, k)] = laserCloudCubeSurfPointer;
                 _last_inFOV[CubeInd(i, j, k)] = last_inFOV_flag;
                 laserCloudCubeSurfPointer->clear();
             }
@@ -464,8 +482,8 @@ void FastLio::LasermapFovSegment()
                     if (inFOV)
                     {
                         int center_index = i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k;
-                        *cube_points_add_ += *featsArray[center_index];
-                        featsArray[center_index]->clear();
+                        *cube_points_add_ += *featsArray_[center_index];
+                        featsArray_[center_index]->clear();
                         if (!last_inFOV)
                         {
                             BoxPointType cub_points;
