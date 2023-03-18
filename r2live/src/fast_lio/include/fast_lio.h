@@ -89,6 +89,11 @@ private:
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
     void ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur);
+public:
+    std::mutex mutex_lio_process_;
+    std::shared_ptr<ImuProcess> imu_process_;
+    double first_lidar_time_ = 0;
+
 private:
     // system parameter
     bool dense_map_en_;
@@ -100,7 +105,6 @@ private:
     double filter_size_surf_min_;
     double filter_size_surf_min_z_;
     double filter_size_map_min_;
-    double first_lidar_time_ = 0;
     double maximum_pt_kdtree_dis_;
     double maximum_res_dis_;
     double planar_check_dis_;
@@ -125,7 +129,8 @@ private:
     int laserCloudCenHeight = 24;
     int laserCloudCenDepth = 24;
 
-    PointCloudXYZI::Ptr featsArray[laserCloudNum];
+    // PointCloudXYZI::Ptr featsArray[laserCloudNum];
+    PointCloudXYZI::Ptr featsArray_[laserCloudNum];
     bool _last_inFOV[laserCloudNum];
     bool now_inFOV[laserCloudNum];
     bool cube_updated[laserCloudNum];
@@ -146,10 +151,9 @@ private:
     nav_msgs::Path path_;
 
 private:
-    std::mutex mutex_lio_process_;
+    
     std::mutex mtx_buffer_;
     std::condition_variable sig_buffer_;
-    std::shared_ptr<ImuProcess> imu_process_;
 
     std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer_;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_;
