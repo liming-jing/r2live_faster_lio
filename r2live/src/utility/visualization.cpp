@@ -62,7 +62,7 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     pub_latest_odometry.publish(odometry);
 }
 
-void printStatistics(const Estimator &estimator, double t, const std::string & file)
+void printStatistics(const Estimator &estimator, double t)
 {
     if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
         return;
@@ -96,16 +96,6 @@ void printStatistics(const Estimator &estimator, double t, const std::string & f
     ROS_DEBUG("vo solver costs: %f ms", t);
     ROS_DEBUG("average of time %f ms", sum_of_time / sum_of_calculation);
 
-    ofstream foutC(file, ios::app);
-    if (!foutC.is_open())
-    {
-        std::cerr << "文件未打开" << std::endl;
-        exit(1);
-    }
-
-    foutC << t << std::endl;
-    foutC.close();
-
     sum_of_path += (estimator.Ps[WINDOW_SIZE] - last_path).norm();
     last_path = estimator.Ps[WINDOW_SIZE];
     ROS_DEBUG("sum of path %f", sum_of_path);
@@ -115,47 +105,7 @@ void printStatistics(const Estimator &estimator, double t, const std::string & f
     }
 }
 
-void WriteOdometry2File(const nav_msgs::Odometry &odometry, const std::string& file)
-{
-        ofstream foutC(file, ios::app);
-        if (!foutC.is_open())
-        {
-            std::cerr << "文件未打开" << std::endl;
-            exit(1);
-        }
-
-        foutC << to_string(odometry.header.stamp.toSec()) << " "
-             << odometry.pose.pose.position.x << " "
-             << odometry.pose.pose.position.y << " "
-             << odometry.pose.pose.position.z << " "
-             << odometry.pose.pose.orientation.x << " "
-             << odometry.pose.pose.orientation.y << " "
-             << odometry.pose.pose.orientation.z << " "
-             << odometry.pose.pose.orientation.w << std::endl;
-        foutC.close();
-}
-
-void WriteOdometry2File(const Estimator &estimator,const Quaterniond tmp_Q, const std_msgs::Header &header, const std::string& file)
-{
-        ofstream foutC(file, ios::app);
-        if (!foutC.is_open())
-        {
-            std::cerr << "文件未打开" << std::endl;
-            exit(1);
-        }
-        foutC <<to_string( header.stamp.toSec())<< " ";
-        foutC << estimator.Ps[WINDOW_SIZE].x() << " "
-              << estimator.Ps[WINDOW_SIZE].y() << " "
-              << estimator.Ps[WINDOW_SIZE].z() << " "
-              << tmp_Q.x() << " "
-              << tmp_Q.y() << " "
-              << tmp_Q.z() << " "
-              << tmp_Q.w() << std::endl;
-        foutC.close();
-}
-
-void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, const std_msgs::Header &header,
-                        const std::string& file)
+void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, const std_msgs::Header &header)
 {
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
     {
@@ -176,7 +126,6 @@ void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, c
         odometry.twist.twist.linear.y =  state.vel_end(1);
         odometry.twist.twist.linear.z =  state.vel_end(2);
         pub_odometry.publish(odometry);
-        // WriteOdometry2File(odometry, file);
 
         if (g_camera_lidar_queue.m_if_write_res_to_bag)
         {
@@ -233,13 +182,11 @@ void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, c
         //       << estimator.Vs[WINDOW_SIZE].y() << ","
         //       << estimator.Vs[WINDOW_SIZE].z() << "," << endl;
         // foutC.close();
-
-        WriteOdometry2File(estimator, tmp_Q, header, file);
     }
 }
 
 
-void pubOdometry(const Estimator &estimator, const std_msgs::Header &header, const std::string& file)
+void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
 {
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
     {
@@ -307,7 +254,6 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header, con
         //       << estimator.Vs[WINDOW_SIZE].y() << ","
         //       << estimator.Vs[WINDOW_SIZE].z() << "," << endl;
         // foutC.close();
-        WriteOdometry2File(estimator, tmp_Q, header, file);
     }
 }
 

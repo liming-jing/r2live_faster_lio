@@ -33,15 +33,11 @@ void registerPub(ros::NodeHandle &n);
 
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, const std_msgs::Header &header);
 
-void printStatistics(const Estimator &estimator, double t,  const std::string & file);
+void printStatistics(const Estimator &estimator, double t);
 
-void pubOdometry(const Estimator &estimator, const std_msgs::Header &header,  const std::string& file);
+void pubOdometry(const Estimator &estimator, const std_msgs::Header &header);
 
-void WriteOdometry2File(const nav_msgs::Odometry &odometry, const std::string& file);
-
-void WriteOdometry2File(const Estimator &estimator,const Quaterniond tmp_Q, const std_msgs::Header &header, const std::string& file);
-
-void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, const std_msgs::Header &header, const std::string& file);
+void pub_LiDAR_Odometry(const Estimator &estimator, const StatesGroup & state, const std_msgs::Header &header);
 
 void pubInitialGuess(const Estimator &estimator, const std_msgs::Header &header);
 
