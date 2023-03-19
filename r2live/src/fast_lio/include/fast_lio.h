@@ -91,9 +91,6 @@ private:
         po[2] = p_global(2);
     }
 
-    int CubeInd(const int &i, const int &j, const int &k);
-    bool CenterinFOV(Eigen::Vector3f cube_p);
-    bool CornerinFOV(Eigen::Vector3f cube_p);
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
     void ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur);
@@ -108,15 +105,9 @@ private:
     double lidar_time_delay_;
     int num_max_iterations_;
     double fov_deg_;
-    double filter_size_corner_min_;
+   
     double filter_size_surf_min_;
-    double filter_size_surf_min_z_;
     double filter_size_map_min_;
-    double maximum_pt_kdtree_dis_;
-    double maximum_res_dis_;
-    double planar_check_dis_;
-    double long_rang_pt_dis_;
-    bool if_publish_feature_map_;
     double last_timestamp_imu_ = -1;
     double last_timestamp_lidar_ = -1;
     double lidar_end_time_ = 0.0;
@@ -125,36 +116,17 @@ private:
     bool lidar_pushed_ = false;
     bool flg_EKF_inited_ = false;
     double cube_len_ = 0.0;
-    double HALF_FOV_COS = 0.0;
     double FOV_DEG = 0.0;
-    double T1[MAXN], T2[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN];
-    int time_log_counter = 0;
-    int FOV_RANGE = 4;
-    double copy_time_, readd_time_, fov_check_time_, readd_box_time_, delete_box_time_;
-
-    int laserCloudCenWidth = 24;
-    int laserCloudCenHeight = 24;
-    int laserCloudCenDepth = 24;
-
    
     PointCloudXYZI::Ptr featsArray_[laserCloudNum];
-    bool _last_inFOV[laserCloudNum];
-    bool now_inFOV[laserCloudNum];
-    bool cube_updated[laserCloudNum];
-    int laserCloudValidInd[laserCloudNum];
-    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; 
 
     std::vector<BoxPointType> cub_needrm_;
-    std::vector<BoxPointType> cub_needad_;
 
     BoxPointType local_map_points_;
     bool local_map_init_;
-    int kdtree_delete_counter_ ;
 
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;
-
-    PointCloudXYZI::Ptr cube_points_add_;
 
     Eigen::Vector3f x_axis_point_body_; //(LIDAR_SP_LEN, 0.0, 0.0);
     Eigen::Vector3f x_axis_point_world_; //(LIDAR_SP_LEN, 0.0, 0.0);
