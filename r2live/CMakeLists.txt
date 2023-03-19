@@ -48,15 +48,17 @@ include(cmake/yaml.cmake)
 include(cmake/ceres.cmake)
 
 
-# set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ./src/fast_lio/include
   ./src/tools/
 )
 
-add_executable(lio_feat_extract src/fast_lio/feature_extract.cpp)
+add_executable(lio_feat_extract 
+              src/apps/lio_feature_extract_node.cc
+              src/fast_lio/src/feature_extract.cc
+              src/fast_lio/src/parameter_server.cc
+)
 target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 add_executable(r2live
@@ -87,12 +89,7 @@ add_executable(r2live
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
 
-# add_library(${PROJECT_NAME}_test SHARED 
-#             src/fast_lio/src/parameter_server.cc            
-# )
-# add_executable(test_app ../test/test_app.cc)
 
-# target_link_libraries(test_app ${PROJECT_NAME}_test ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 
 

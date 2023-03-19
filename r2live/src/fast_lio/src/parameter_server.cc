@@ -20,5 +20,9 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "fast_lio/planar_check_dis", planar_check_dis_, 0.05);
     GetROSParameter(nh, "fast_lio/long_rang_pt_dis", long_rang_pt_dis_, 50.0);
     GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
+
+    /* feature parameters */
+    // nh.param<int>("feature_extraction/N_SCANS", N_SCANS_, 1);
+    GetROSParameter(nh,"feature_extraction/N_SCANS", n_scans_, 1800);
 }
 

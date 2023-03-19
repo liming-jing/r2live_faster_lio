@@ -61,8 +61,11 @@ class ParameterServer {
         inline double GetLongRangPtDis() const {return long_rang_pt_dis_;}
         inline bool GetIfPublishFeatureMap() const {return if_publish_feature_map_;}
 
+        /* feature extract get parameter */
+        inline int GetNScans() const {return n_scans_;}
+
     private:
-         /*fast_lio_parameter*/
+        /* fast lio parameter */
         std::string imu_topic_;
         bool dense_map_en_;
         double lidar_time_delay_;
@@ -78,6 +81,9 @@ class ParameterServer {
         double planar_check_dis_;
         double long_rang_pt_dis_;
         bool if_publish_feature_map_;
+
+        /* feature extract parameter */
+        int n_scans_;
 
 
 };
