@@ -4,12 +4,16 @@
 #include <ros/ros.h>
 #include <yaml-cpp/yaml.h>
 #include <string>
+#include <mutex>
 #include "common_lib.h"
 
 class ParameterServer {
     private:
-        ParameterServer(){};
-        ~ParameterServer() {}
+        ParameterServer(){}
+        ~ParameterServer(){}
+
+        ParameterServer(const ParameterServer& instance) = delete;
+        const ParameterServer &operator=(const ParameterServer& instance) = delete;
 
         static ParameterServer* instance ;
 
@@ -31,7 +35,7 @@ class ParameterServer {
             if (instance == nullptr)
             {
                 instance = new ParameterServer();
-                static MemoryReclamation mr;
+                // static MemoryReclamation mr;
             }
             return instance;
         }
@@ -43,6 +47,7 @@ class ParameterServer {
         /*fast_lio get parameter*/
         inline std::string GetImuTopic() const {return imu_topic_;}
         inline bool GetDenseMapEn() const {return dense_map_en_;}
+        inline double GetLidarTimeDelay() const {return lidar_time_delay_;}
         inline int GetNumMaxIterations() const {return num_max_iterations_;}
         inline double GetFovDeg() const {return fov_deg_;}
         inline double GetFilterSizeCornerMin() const {return filter_size_corner_min_;}

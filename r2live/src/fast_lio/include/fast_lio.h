@@ -30,6 +30,8 @@
 #include <geometry_msgs/Vector3.h>
 #include "pointcloud_map.h"
 #include "lio_core.h"
+#include "parameter_server.h"
+#include <glog/logging.h>
 
 #define MAXN 360000
 
@@ -98,7 +100,8 @@ private:
     // system parameter
     bool dense_map_en_;
     double lidar_time_delay_;
-    int NUM_MAX_ITERATIONS;
+    // int NUM_MAX_ITERATIONS;
+    int num_max_iterations_;
     double fov_deg_;
     double filter_size_corner_min_;
     double filter_size_surf_min_;

@@ -12,8 +12,9 @@
 #include "estimator.h"
 #include "parameters.h"
 #include "utility/visualization.h"
-// #include "./fast_lio/fast_lio.hpp"
 #include "./fast_lio/include/fast_lio.h"
+#include "./fast_lio/include/parameter_server.h"
+
 #define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
@@ -850,7 +851,10 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "vins_estimator");
     ros::NodeHandle nh("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
-    // ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+   
+    ParameterServer* para_server = ParameterServer::GetInstance();
+    para_server->InitParamWithRos(nh);
+
     readParameters(nh);
     estimator.setParameter();
 
