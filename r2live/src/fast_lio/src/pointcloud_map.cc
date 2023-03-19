@@ -23,15 +23,17 @@ void PointCloudMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
     std::cout << "Ikdtree initialization succeeded" << std::endl;
 }
 
-void PointCloudMap::DeletePointBoxes(std::vector<BoxPointType>& cub_needrm)
+int PointCloudMap::DeletePointBoxes(std::vector<BoxPointType>& cub_needrm)
 {
+    int kdtree_delete_counter = 0;
     if (ikdtree_.Root_Node != nullptr)
     {
-        ikdtree_.Delete_Point_Boxes(cub_needrm);
+        kdtree_delete_counter = ikdtree_.Delete_Point_Boxes(cub_needrm);
     }
     else {
         std::cerr << "Ikdtree not initialized" << std::endl;
     }
+    return kdtree_delete_counter;
 }
 void PointCloudMap::AddPointBoxes(std::vector<BoxPointType>& cub_needad)
 {
@@ -48,6 +50,17 @@ void PointCloudMap::AddPoints(PointCloudXYZI::Ptr cube_points_add)
     if (ikdtree_.Root_Node != nullptr)
     {
         ikdtree_.Add_Points(cube_points_add->points, true);
+    }
+    else {
+        std::cerr << "Ikdtree not initialized" << std::endl;
+    }
+}
+
+void PointCloudMap::AcquireRemovedPoints(PointVector& points_history)
+{
+    if (ikdtree_.Root_Node != nullptr)
+    {
+        ikdtree_.acquire_removed_points(points_history);
     }
     else {
         std::cerr << "Ikdtree not initialized" << std::endl;

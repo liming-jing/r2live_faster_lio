@@ -232,7 +232,6 @@ StatesGroup ImuProcess::ImuPreintegration(const StatesGroup & state_in,
                                           std::deque<sensor_msgs::Imu::ConstPtr> & v_imu, 
                                           int if_multiply_g, double end_pose_dt)
 {
-    std::unique_lock<std::mutex> lock(g_imu_premutex_);
     StatesGroup state_inout = state_in;
     if (check_state(state_inout))
     {

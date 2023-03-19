@@ -43,6 +43,9 @@ const int laserCloudHeight = 48;
 const int laserCloudDepth = 48;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 
+const float kMovThreshold = 1.5f;
+const float kDetRange = 300.0f;
+
 #define INIT_TIME (0)
 #define LASER_POINT_COV (0.00015)    
 #define NUM_MATCH_POINTS (5)
@@ -50,6 +53,7 @@ const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
 extern StatesGroup g_lio_state;
+
 
 class FastLio {
 public:
@@ -62,6 +66,7 @@ private:
     void SigHanle(int sig);
     void PointBodyToWorld(PointType const *const pi, PointType *const po);
     void LasermapFovSegment();
+    void LasermapFovSegment(Eigen::Vector3d pos);
     void FeatPointsCbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in);
     bool SyncPackages(MeasureGroup &meas);
@@ -143,6 +148,10 @@ private:
 
     std::vector<BoxPointType> cub_needrm_;
     std::vector<BoxPointType> cub_needad_;
+
+    BoxPointType local_map_points_;
+    bool local_map_init_;
+    int kdtree_delete_counter_ ;
 
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;

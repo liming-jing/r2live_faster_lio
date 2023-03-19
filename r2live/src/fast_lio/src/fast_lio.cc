@@ -37,6 +37,8 @@ void FastLio::Init(ros::NodeHandle& nh)
     path_.header.stamp = ros::Time::now();
     path_.header.frame_id = "/world";
 
+    local_map_init_ = false;
+    kdtree_delete_counter_ = 0;
 
     FOV_DEG = fov_deg_ + 10;
     HALF_FOV_COS = std::cos((fov_deg_ + 10.0) * 0.5 * PI_M / 180.0);
@@ -182,9 +184,9 @@ int FastLio::Process()
             flg_reset_ = false;
             continue;
         }
-        // 
+       
         imu_process_->Process(Measures, g_lio_state, feats_undistort_);
-        // 
+       
         g_camera_lidar_queue.g_noise_cov_acc = imu_process_->cov_acc_;
         g_camera_lidar_queue.g_noise_cov_gyro = imu_process_->cov_gyr_;
         StatesGroup state_propagat(g_lio_state);
@@ -193,22 +195,19 @@ int FastLio::Process()
         {
             first_lidar_time_ = Measures.lidar_beg_time;
             g_lio_state.last_update_time = first_lidar_time_;
-            std::cout << "not ready for odometry" << std::endl;
             continue;
         }
 
         if ((Measures.lidar_beg_time - first_lidar_time_) < INIT_TIME)
         {
             flg_EKF_inited_ = false;
-            std::cout << "||||||||||Initiallizing LiDar||||||||||" << std::endl;
         }
         else
         {
             flg_EKF_inited_ = true;
         }
 
-        
-        LasermapFovSegment();
+        LasermapFovSegment(g_lio_state.pos_end);
         
         downsize_filter_surf_.setInputCloud(feats_undistort_);
         downsize_filter_surf_.filter(*feats_down_);
@@ -225,10 +224,10 @@ int FastLio::Process()
             std::cout << "Insufficient map points, discard update!" << std::endl;
             continue;
         }
-        //
+
         lio_core_ptr_->SetEKFFlg(flg_EKF_inited_);
         lio_core_ptr_->Update(feats_down_);
-        //
+
 
         int points_size = feats_down_->points.size();
         PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI(*feats_down_));
@@ -239,7 +238,7 @@ int FastLio::Process()
 
         point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray_);
         PublishData(feats_undistort_, feats_down_);
-        //
+
         rate.sleep();
     }
     return 0;
@@ -533,6 +532,62 @@ void FastLio::LasermapFovSegment()
         point_cloud_map_ptr_->AddPointBoxes(cub_needad_);
     if (cube_points_add_->points.size() > 0)
         point_cloud_map_ptr_->AddPoints(cube_points_add_);
+}
+
+void FastLio::LasermapFovSegment(Eigen::Vector3d pos)
+{
+    cub_needrm_.clear();
+    static float Mov_DetRange_result = kMovThreshold * kDetRange;
+    PointBodyToWorld(x_axis_point_body_, x_axis_point_world_);
+    Eigen::Vector3d pos_LiD = pos;
+    if (!local_map_init_){
+        for (int i = 0; i < 3; i++){
+            local_map_points_.vertex_min[i] = pos_LiD(i) - cube_len_ / 2.0;
+            local_map_points_.vertex_max[i] = pos_LiD(i) + cube_len_ / 2.0;
+        }
+        local_map_init_ = true;
+        return;
+    }
+
+    float dist_to_map_edge[3][2];
+    bool need_move = false;
+    for (int i = 0; i < 3; i++){
+        dist_to_map_edge[i][0] = fabs(pos_LiD(i) - local_map_points_.vertex_min[i]);
+        dist_to_map_edge[i][1] = fabs(pos_LiD(i) - local_map_points_.vertex_max[i]);
+        if (dist_to_map_edge[i][0] <= Mov_DetRange_result || dist_to_map_edge[i][1] <= Mov_DetRange_result) 
+        {
+            need_move = true;
+        }
+    }
+
+    if (!need_move) return;
+
+    BoxPointType New_LocalMap_Points, tmp_boxpoints;
+    New_LocalMap_Points = local_map_points_;
+    float mov_dist = max((cube_len_ - 2.0 * Mov_DetRange_result) * 0.5 * 0.9, double(kDetRange * (kMovThreshold -1)));
+    for (int i = 0; i < 3; i++){
+        tmp_boxpoints = local_map_points_;
+        if (dist_to_map_edge[i][0] <= Mov_DetRange_result){
+            New_LocalMap_Points.vertex_max[i] -= mov_dist;
+            New_LocalMap_Points.vertex_min[i] -= mov_dist;
+            tmp_boxpoints.vertex_min[i] = local_map_points_.vertex_max[i] - mov_dist;
+            cub_needrm_.push_back(tmp_boxpoints);
+        } else if (dist_to_map_edge[i][1] <= Mov_DetRange_result){
+            New_LocalMap_Points.vertex_max[i] += mov_dist;
+            New_LocalMap_Points.vertex_min[i] += mov_dist;
+            tmp_boxpoints.vertex_max[i] = local_map_points_.vertex_min[i] + mov_dist;
+            cub_needrm_.push_back(tmp_boxpoints);
+        }
+    }
+    local_map_points_ = New_LocalMap_Points;
+
+    PointVector points_history;
+    point_cloud_map_ptr_->AcquireRemovedPoints(points_history);
+
+    if(cub_needrm_.size() > 0) 
+    {
+        kdtree_delete_counter_ = point_cloud_map_ptr_->DeletePointBoxes(cub_needrm_);
+    }
 }
 
 int FastLio::CubeInd(const int &i, const int &j, const int &k)

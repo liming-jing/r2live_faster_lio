@@ -14,9 +14,10 @@ class PointCloudMap{
     public:
         PointCloudMap();
         void InitPointCloudMap(PointCloudXYZI::Ptr cloud);
-        void DeletePointBoxes(std::vector<BoxPointType>& cub_needrm);
+        int DeletePointBoxes(std::vector<BoxPointType>& cub_needrm);
         void AddPointBoxes(std::vector<BoxPointType>& cub_needad);
         void AddPoints(PointCloudXYZI::Ptr cube_points_add);
+        void AcquireRemovedPoints(PointVector& points_history);
         int GetPointsNumFromMap();
         void NearestSearch(PointType & point, int num, PointVector& points_near, std::vector<float>& point_search_sq_dis);
         void AddNewPointCloud(PointCloudXYZI::Ptr cloud, PointCloudXYZI::Ptr featsArray[]);
