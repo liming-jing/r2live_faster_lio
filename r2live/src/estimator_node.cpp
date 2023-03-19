@@ -463,7 +463,8 @@ void process()
                 lock_lio(estimator);
                 t_s.tic();
                 double camera_LiDAR_tim_diff = img_msg->header.stamp.toSec() + g_camera_lidar_queue.m_camera_imu_td - g_lio_state.last_update_time;
-            *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
+                // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
+                p_imu = estimator.m_fast_lio_instance->imu_process_;
             }
 
             if ((g_camera_lidar_queue.m_if_lidar_can_start == true) && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))
@@ -569,8 +570,9 @@ void process()
                 esikf_update_valid = true;
                 if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR))
                 {
-                    *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
-                    state_aft_integration = p_imu->imu_preintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
+                    // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
+                    p_imu = estimator.m_fast_lio_instance->imu_process_;
+                    state_aft_integration = p_imu->ImuPreintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
                     estimator.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
                     
                     diff_vins_lio_q = eigen_q(estimator.Rs[WINDOW_SIZE].transpose() * state_aft_integration.rot_end);

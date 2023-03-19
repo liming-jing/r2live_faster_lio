@@ -174,9 +174,6 @@ int FastLio::Process()
 
         if(g_camera_lidar_queue.m_if_lidar_can_start== 0) continue;
 
-       
-        g_lidar_star_tim = first_lidar_time_;
-
         if (flg_reset_)
         {
             imu_process_->Reset();
@@ -186,8 +183,8 @@ int FastLio::Process()
         // 
         imu_process_->Process(Measures, g_lio_state, feats_undistort_);
         // 
-        g_camera_lidar_queue.g_noise_cov_acc = imu_process_->cov_acc;
-        g_camera_lidar_queue.g_noise_cov_gyro = imu_process_->cov_gyr;
+        g_camera_lidar_queue.g_noise_cov_acc = imu_process_->cov_acc_;
+        g_camera_lidar_queue.g_noise_cov_gyro = imu_process_->cov_gyr_;
         StatesGroup state_propagat(g_lio_state);
 
         if (feats_undistort_->empty() || (feats_undistort_ == NULL))

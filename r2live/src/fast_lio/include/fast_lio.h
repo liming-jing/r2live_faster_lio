@@ -3,6 +3,8 @@
 
 #include <omp.h>
 #include <mutex>
+#include <condition_variable>
+
 #include <math.h>
 #include <thread>
 #include <fstream>
@@ -12,8 +14,6 @@
 #include <ros/ros.h>
 #include <Eigen/Core>
 #include <opencv/cv.h>
-#include <common_lib.h>
-#include "IMU_Processing.hpp"
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <opencv2/core/eigen.hpp>
@@ -28,10 +28,14 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/Vector3.h>
+#include <glog/logging.h>
+
 #include "pointcloud_map.h"
 #include "lio_core.h"
 #include "parameter_server.h"
-#include <glog/logging.h>
+#include "common_lib.h"
+#include "imu_process.h"
+// #include "IMU_Processing.hpp"
 
 #define MAXN 360000
 
@@ -47,7 +51,6 @@ const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
 extern StatesGroup g_lio_state;
-extern double g_lidar_star_tim;
 
 class FastLio {
 public:
