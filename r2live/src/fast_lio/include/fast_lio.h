@@ -1,16 +1,12 @@
 #ifndef _FAST_LIO_H_
 #define _FAST_LIO_H_
 
-#include <omp.h>
 #include <mutex>
 #include <condition_variable>
-
 #include <math.h>
 #include <thread>
-#include <fstream>
 #include <csignal>
 #include <unistd.h>
-#include <so3_math.h>
 #include <ros/ros.h>
 #include <Eigen/Core>
 #include <opencv/cv.h>
@@ -35,20 +31,15 @@
 #include "parameter_server.h"
 #include "common_lib.h"
 #include "imu_process.h"
-
-#define MAXN 360000
+#include "so3_math.h"
 
 const int laserCloudWidth = 48;
 const int laserCloudHeight = 48;
 const int laserCloudDepth = 48;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
-
 const float kMovThreshold = 1.5f;
 const float kDetRange = 300.0f;
-
-#define INIT_TIME (0)
-#define LASER_POINT_COV (0.00015)    
-#define NUM_MATCH_POINTS (5)
+const double kInitTime = 0.0f;
 
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
