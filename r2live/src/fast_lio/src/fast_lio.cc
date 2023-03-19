@@ -17,38 +17,6 @@ FastLio::FastLio(ros::NodeHandle& nh)
 
 void FastLio::Init(ros::NodeHandle& nh)
 {
-    // nh.param<std::string>("imu_topic", imu_topic_, "/livox/imu");
-    // GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en_, true);
-    // GetROSParameter(nh, "fast_lio/lidar_time_delay", lidar_time_delay_, 0.0);
-    // GetROSParameter(nh, "fast_lio/max_iteration", num_max_iterations_, 4);
-    // GetROSParameter(nh, "fast_lio/fov_degree", fov_deg_, 70.00);
-    // GetROSParameter(nh, "fast_lio/filter_size_corner", filter_size_corner_min_, 0.4);
-    // GetROSParameter(nh, "fast_lio/filter_size_surf", filter_size_surf_min_, 0.4);
-    // GetROSParameter(nh, "fast_lio/filter_size_surf_z", filter_size_surf_min_z_, 0.4);
-    // GetROSParameter(nh, "fast_lio/filter_size_map", filter_size_map_min_, 0.4);
-    // GetROSParameter(nh, "fast_lio/cube_side_length", cube_len_, 100.0);
-    // GetROSParameter(nh, "fast_lio/maximum_pt_kdtree_dis", maximum_pt_kdtree_dis_, 3.0);
-    // GetROSParameter(nh, "fast_lio/maximum_res_dis", maximum_res_dis_, 3.0);
-    // GetROSParameter(nh, "fast_lio/planar_check_dis", planar_check_dis_, 0.05);
-    // GetROSParameter(nh, "fast_lio/long_rang_pt_dis", long_rang_pt_dis_, 50.0);
-    // GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
-
-   
-    // LOG(INFO) << "imu_topic : " << imu_topic_ ;
-    // LOG(INFO) << "dense_map_en: " << dense_map_en_;
-    // LOG(INFO) << "lidar_time_delay: " << lidar_time_delay_;
-    // LOG(INFO) << "num_max_iterations: " << num_max_iterations_;
-    // LOG(INFO) << "fov_deg: " << fov_deg_;
-    // LOG(INFO) << "filter_size_corner_min: " << filter_size_corner_min_;
-    // LOG(INFO) << "filter_size_surf_min: " << filter_size_surf_min_;
-    // LOG(INFO) << "filter_size_surf_min_z: " << filter_size_surf_min_z_;
-    // LOG(INFO) << "filter_size_map_min: " << filter_size_map_min_ ;
-    // LOG(INFO) << "cube_len: " << cube_len_;
-    // LOG(INFO) << "maximum_pt_kdtree_dis: " << maximum_pt_kdtree_dis_;
-    // LOG(INFO) << "planar_check_dis: " << planar_check_dis_;
-    // LOG(INFO) << "long_range_pt_dis: " << long_rang_pt_dis_;
-    // LOG(INFO) << "if_publish_feature_map: " << if_publish_feature_map_;
-
     ParameterServer *para_server = ParameterServer::GetInstance();
     imu_topic_ = para_server->GetImuTopic();
     dense_map_en_ = para_server->GetDenseMapEn();
@@ -65,26 +33,6 @@ void FastLio::Init(ros::NodeHandle& nh)
     planar_check_dis_ = para_server->GetPlanarCheckDis();
     long_rang_pt_dis_ = para_server->GetLongRangPtDis();
     if_publish_feature_map_ = para_server->GetIfPublishFeatureMap();
-    
-
-
-    // LOG(INFO) << "imu_topic : " << imu_topic_ ;
-    // LOG(INFO) << "dense_map_en: " << dense_map_en_;
-    // LOG(INFO) << "lidar_time_delay: " << lidar_time_delay_;
-    // LOG(INFO) << "num_max_iterations: " << num_max_iterations_;
-    // LOG(INFO) << "fov_deg: " << fov_deg_;
-    // LOG(INFO) << "filter_size_corner_min: " << filter_size_corner_min_;
-    // LOG(INFO) << "filter_size_surf_min: " << filter_size_surf_min_;
-    // LOG(INFO) << "filter_size_surf_min_z: " << filter_size_surf_min_z_;
-    // LOG(INFO) << "filter_size_map_min: " << filter_size_map_min_ ;
-    // LOG(INFO) << "cube_len: " << cube_len_;
-    // LOG(INFO) << "maximum_pt_kdtree_dis: " << maximum_pt_kdtree_dis_;
-    // LOG(INFO) << "planar_check_dis: " << planar_check_dis_;
-    // LOG(INFO) << "long_range_pt_dis: " << long_rang_pt_dis_;
-    // LOG(INFO) << "if_publish_feature_map: " << if_publish_feature_map_;
-
-
-    // exit(1);
     
     path_.header.stamp = ros::Time::now();
     path_.header.frame_id = "/world";
@@ -108,11 +56,7 @@ void FastLio::Init(ros::NodeHandle& nh)
     downsize_filter_map_.setLeafSize(filter_size_map_min_, filter_size_map_min_, filter_size_map_min_);
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
 
-    lio_core_ptr_ = std::make_shared<LioCore>(num_max_iterations_,
-                                             maximum_pt_kdtree_dis_,
-                                             planar_check_dis_,
-                                             long_rang_pt_dis_,
-                                             maximum_res_dis_);
+    lio_core_ptr_ = std::make_shared<LioCore>();
     point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_, cube_len_);
     lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
 

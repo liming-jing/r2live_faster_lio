@@ -1,21 +1,20 @@
 #include "lio_core.h"
 
-LioCore::LioCore(int num_max_iterations, 
-                double maximum_pt_kdtree_dis,
-                double planar_check_dis,
-                double long_rang_pt_dis,
-                double maximum_res_dis)
+LioCore::LioCore()
 {
     Init();
-    num_max_iterations_ = num_max_iterations;
-    maximum_pt_kdtree_dis_ = maximum_pt_kdtree_dis;
-    planar_check_dis_ = planar_check_dis;
-    long_rang_pt_dis_ = long_rang_pt_dis;
-    maximum_res_dis_ = maximum_res_dis;
 }
 
 void LioCore::Init()
 {
+
+    ParameterServer* para_server = ParameterServer::GetInstance();
+    num_max_iterations_ = para_server->GetNumMaxIterations();
+    maximum_pt_kdtree_dis_ = para_server->GetMaximumPtKdtreeDis();
+    planar_check_dis_ = para_server->GetPlanarCheckDis();
+    long_rang_pt_dis_ = para_server->GetLongRangPtDis();
+    maximum_res_dis_ = para_server->GetMaximumResDis();
+
     laser_cloud_ori_.reset(new PointCloudXYZI());
     coeff_sel_.reset(new PointCloudXYZI());
 

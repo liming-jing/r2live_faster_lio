@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <memory>
+#include <glog/logging.h>
+#include "parameter_server.h"
 #include "pointcloud_map.h"
 #include "common_lib.h"
 
@@ -13,11 +15,7 @@ extern StatesGroup g_lio_state;
 
 class LioCore{
     public:
-        LioCore(int num_max_iterations, 
-        double maximum_pt_kdtree_dis,
-        double planar_check_dis,
-        double long_rang_pt_dis,
-        double maximum_res_dis);
+        LioCore();
 
         void SetEKFFlg(bool flg_EKF_inited);
         void SetPointCloudMap(std::shared_ptr<PointCloudMap> point_cloud_map);
