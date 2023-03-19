@@ -1,19 +1,16 @@
 #include "pointcloud_map.h"
 
 
-PointCloudMap::PointCloudMap(double filter_size_map_min, double cube_len) 
+PointCloudMap::PointCloudMap() 
 {
-    // Init();
-    filter_size_map_min_ = filter_size_map_min;
-    cube_len_ = cube_len;
+    Init();
 }
 
 void PointCloudMap::Init()
 {
-    // for (int i = 0; i < kLaserCloudNum; i++)
-    // {
-    //     featsArray_[i].reset(new PointCloudXYZI());
-    // }
+    ParameterServer* para_server = ParameterServer::GetInstance();
+    filter_size_map_min_ = para_server->GetFilterSizeMapMin();
+    cube_len_ = para_server->GetCubeLen();
 }
 
 void PointCloudMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)

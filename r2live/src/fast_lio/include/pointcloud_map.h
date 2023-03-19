@@ -1,6 +1,7 @@
 #ifndef _POINTCLOUD_MAP_H_
 #define _POINTCLOUD_MAP_H_
 
+#include "parameter_server.h"
 #include "common_lib.h"
 #include "kd_tree/ikd_Tree.h"
 
@@ -11,7 +12,7 @@ const int kLaserCloudNum = kLaserCloudWidth * kLaserCloudHeight * kLaserCloudDep
 
 class PointCloudMap{
     public:
-        PointCloudMap(double filter_size_map_min, double cube_len);
+        PointCloudMap();
         void InitPointCloudMap(PointCloudXYZI::Ptr cloud);
         void DeletePointBoxes(std::vector<BoxPointType>& cub_needrm);
         void AddPointBoxes(std::vector<BoxPointType>& cub_needad);
@@ -33,8 +34,6 @@ class PointCloudMap{
         double filter_size_map_min_;
         bool cube_updated_[kLaserCloudNum];
         double cube_len_ = 0.0;
-
-        // PointCloudXYZI::Ptr featsArray_[kLaserCloudNum];
 
     private:
         KD_TREE ikdtree_;

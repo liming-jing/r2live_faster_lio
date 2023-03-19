@@ -57,7 +57,7 @@ void FastLio::Init(ros::NodeHandle& nh)
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
 
     lio_core_ptr_ = std::make_shared<LioCore>();
-    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>(filter_size_map_min_, cube_len_);
+    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>();
     lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
 
     imu_process_ = std::make_shared<ImuProcess>();
