@@ -4,12 +4,9 @@ project(r2live)
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++17 -O3 -w")
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-
-add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
@@ -20,52 +17,47 @@ find_package(catkin REQUIRED COMPONENTS
     cv_bridge
     message_generation
     livox_ros_driver
-
     pcl_ros
     pcl_conversions
     )
 
-
-find_package(OpenMP QUIET)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
-find_package(OpenCV REQUIRED)
-
-find_package(Ceres REQUIRED)
-find_package(PCL REQUIRED)
-find_package(PythonLibs REQUIRED)
-find_package(yaml-cpp REQUIRED)
-
-include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
-
 add_message_files(
-  FILES
-  Pose6D.msg
-  States.msg
-  cloud_info.msg
-)
-
+      FILES
+      Pose6D.msg
+      States.msg
+      cloud_info.msg
+    )
+    
 generate_messages(
- DEPENDENCIES
- geometry_msgs
-)
+     DEPENDENCIES
+     geometry_msgs
+    )
+    
+catkin_package(DEPENDS PCL)
 
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-find_package(Eigen3)
+add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
+
+set(ALL_TARGET_LIBRARIES "")
+
+include(cmake/eigen.cmake)
+include(cmake/glog.cmake)
+include(cmake/OpenCV.cmake)
+include(cmake/OpenMP.cmake)
+include(cmake/pcl.cmake)
+include(cmake/yaml.cmake)
+include(cmake/ceres.cmake)
+
+
+# set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 include_directories(
   ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
-  ${PCL_INCLUDE_DIRS}
-  ${PYTHON_INCLUDE_DIRS}
-  ${yaml-cpp_INCLUDE_DIRS}
   ./src/fast_lio/include
   ./src/tools/
 )
 
-catkin_package(DEPENDS PCL)
-
 add_executable(lio_feat_extract src/fast_lio/feature_extract.cpp)
-target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 add_executable(r2live
     src/estimator_node.cpp
@@ -90,16 +82,17 @@ add_executable(r2live
     src/fast_lio/src/fast_lio.cc 
     src/fast_lio/src/lio_core.cc 
     src/fast_lio/src/pointcloud_map.cc 
+    src/fast_lio/src/parameter_server.cc
     )
 
-target_link_libraries(r2live ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) 
+target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
 
 # add_library(${PROJECT_NAME}_test SHARED 
 #             src/fast_lio/src/parameter_server.cc            
 # )
 # add_executable(test_app ../test/test_app.cc)
 
-# target_link_libraries(test_app ${PROJECT_NAME}_test)
+# target_link_libraries(test_app ${PROJECT_NAME}_test ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 
 
