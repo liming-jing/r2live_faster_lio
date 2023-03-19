@@ -6,7 +6,6 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <Eigen/Eigen>
-#include <mutex>
 
 #include "common_lib.h"
 
@@ -66,8 +65,6 @@ class ImuProcess{
         std::deque<sensor_msgs::ImuConstPtr> v_imu_;
         std::vector<Eigen::Matrix3d> v_rot_pcl_;
         std::vector<Pose6D> imu_pose_;
-
-        std::mutex g_imu_premutex_;
 };
 
 #endif
