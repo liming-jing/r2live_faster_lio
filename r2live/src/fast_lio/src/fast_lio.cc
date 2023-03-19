@@ -121,7 +121,7 @@ bool FastLio::SyncPackages(MeasureGroup &meas)
         meas.lidar.reset(new PointCloudXYZI());
         pcl::fromROSMsg(*(lidar_buffer_.front()), *(meas.lidar));
         meas.lidar_beg_time = lidar_buffer_.front()->header.stamp.toSec();
-        lidar_end_time_ = meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000);
+        lidar_end_time_ = meas.lidar_beg_time + meas.lidar->points.back().curvature * 1e-3;
         meas.lidar_end_time = lidar_end_time_;
         lidar_pushed_ = true;
     }
@@ -157,21 +157,23 @@ int FastLio::Process()
         if (flg_exit_) break;
         ros::spinOnce();
 
-        //
         while (g_camera_lidar_queue.if_lidar_can_process() == false)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        //
+
         std::unique_lock<std::mutex> lock(mutex_lio_process_);
 
-        if (SyncPackages(Measures) == false)
-        {
-            continue;
-        }
-
+        std::unique_lock<std::mutex> lck(mtx_buffer_);
+        sig_buffer_.wait(lck, [&]() {
+            if (SyncPackages(Measures))
+            {
+                return true;
+            }
+            return false;
+        });
+        lck.unlock();
       
-
         if(g_camera_lidar_queue.m_if_lidar_can_start== 0) continue;
 
         if (flg_reset_)
