@@ -35,7 +35,7 @@ class ParameterServer {
             if (instance == nullptr)
             {
                 instance = new ParameterServer();
-                // static MemoryReclamation mr;
+                static MemoryReclamation mr;
             }
             return instance;
         }
