@@ -214,6 +214,7 @@ int FastLio::Process()
 
         if (!flg_map_inited_)
         {
+            // PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI());
             point_cloud_map_ptr_->InitPointCloudMap(feats_down_);
             flg_map_inited_ = true;
             continue;
@@ -235,7 +236,7 @@ int FastLio::Process()
         {
             PointTypeBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
         }
-
+    
         point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray_);
         PublishData(feats_undistort_, feats_down_);
 

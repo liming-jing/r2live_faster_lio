@@ -106,7 +106,6 @@ private:
     // system parameter
     bool dense_map_en_;
     double lidar_time_delay_;
-    // int NUM_MAX_ITERATIONS;
     int num_max_iterations_;
     double fov_deg_;
     double filter_size_corner_min_;
@@ -137,13 +136,13 @@ private:
     int laserCloudCenHeight = 24;
     int laserCloudCenDepth = 24;
 
-    // PointCloudXYZI::Ptr featsArray[laserCloudNum];
+   
     PointCloudXYZI::Ptr featsArray_[laserCloudNum];
     bool _last_inFOV[laserCloudNum];
     bool now_inFOV[laserCloudNum];
     bool cube_updated[laserCloudNum];
     int laserCloudValidInd[laserCloudNum];
-    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
+    pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; 
 
     std::vector<BoxPointType> cub_needrm_;
     std::vector<BoxPointType> cub_needad_;
