@@ -59,7 +59,7 @@ void ImuProcess::Process(const MeasureGroup &meas, StatesGroup &stat, PointCloud
         ImuInit(meas, stat, init_iter_num_);
         last_imu_ = meas.imu.back();
 
-        if (init_iter_num_ > 0)
+        if (init_iter_num_ > kMaxInitCount)
         {
             imu_need_init_ = false;
         }

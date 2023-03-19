@@ -10,6 +10,8 @@
 
 #include "common_lib.h"
 
+const int kMaxInitCount = 10;
+
 const double kCovStartAccDiag = 1e-10;
 const double kCovStartGyroDiag = 1e-10;
 const double kCovOmegaNoiseDiag = 1e-2;
