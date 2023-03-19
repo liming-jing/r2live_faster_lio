@@ -65,7 +65,6 @@ private:
     void Init(ros::NodeHandle& nh);
     void SigHanle(int sig);
     void PointBodyToWorld(PointType const *const pi, PointType *const po);
-    void LasermapFovSegment();
     void LasermapFovSegment(Eigen::Vector3d pos);
     void FeatPointsCbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void ImuCbk(const sensor_msgs::Imu::ConstPtr &msg_in);
