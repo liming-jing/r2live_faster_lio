@@ -37,7 +37,6 @@ using Mat15d = Eigen::Matrix<double, 15, 15>;
 using Quatd = Eigen::Quaterniond;
 using Quatf = Eigen::Quaternionf;
 
-namespace faster_lio {
 
 /// less of vector
 template <int N>
@@ -78,7 +77,5 @@ inline size_t hash_vec<3>::operator()(const Eigen::Matrix<int, 3, 1>& v) const {
 constexpr auto less_vec2i = [](const Vec2i& v1, const Vec2i& v2) {
     return v1[0] < v2[0] || (v1[0] == v2[0] && v1[1] < v2[1]);
 };
-
-}  // namespace faster_lio
 
 #endif
