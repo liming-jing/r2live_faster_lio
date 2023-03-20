@@ -46,6 +46,7 @@ include(cmake/OpenMP.cmake)
 include(cmake/pcl.cmake)
 include(cmake/yaml.cmake)
 include(cmake/ceres.cmake)
+include(cmake/tbb.cmake)
 
 
 include_directories(
@@ -79,8 +80,6 @@ add_executable(r2live
     src/initial/initial_ex_rotation.cpp
     src/fast_lio/include/kd_tree/ikd_Tree.cpp
     src/fast_lio/include/FOV_Checker/FOV_Checker.cpp 
-    
-    # src/fast_lio/IMU_Processing.cpp
 
     src/fast_lio/src/fast_lio.cc 
     src/fast_lio/src/lio_core.cc 
