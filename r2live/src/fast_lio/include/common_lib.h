@@ -125,8 +125,9 @@ Eigen::Matrix< T, 3, 3 > inverse_right_jacobian_of_rotion_matrix(const Eigen::Ma
 }
 
 
-struct Camera_Lidar_queue
+class Camera_Lidar_queue
 {
+public:
     double m_first_imu_time = -3e8;
     double m_sliding_window_tim = 10000;
     double m_last_imu_time = -3e8;
@@ -167,14 +168,13 @@ struct Camera_Lidar_queue
     };
     ~Camera_Lidar_queue(){};
 
-    double imu_in(const double &in_time)
+    void imu_in(const double &in_time)
     {
         if (m_first_imu_time < 0)
         {
             m_first_imu_time = in_time;
         }
         m_last_imu_time = std::max(in_time, m_last_imu_time);
-        // m_last_imu_time = in_time;
     }
 
     int lidar_in(const double &in_time)
