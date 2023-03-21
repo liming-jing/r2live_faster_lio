@@ -1,4 +1,4 @@
-#include "visualization.h"
+#include "utility/visualization.h"
 
 using namespace ros;
 using namespace Eigen;

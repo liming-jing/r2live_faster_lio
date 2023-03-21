@@ -1,4 +1,4 @@
-#include "initial_sfm.h"
+#include "initial/initial_sfm.h"
 
 GlobalSFM::GlobalSFM(){}
 

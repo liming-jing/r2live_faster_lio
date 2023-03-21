@@ -51,24 +51,23 @@ include(cmake/tbb.cmake)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
-  ./src/fast_lio/include
-  ./src/tools/
+  include
 )
 
 add_executable(lio_feat_extract 
-              src/apps/lio_feature_extract_node.cc
-              src/fast_lio/src/feature_extract.cc
-              src/fast_lio/src/parameter_server.cc
+              apps/lio_feature_extract_node.cc
+              src/fast_lio/feature_extract.cc
+              src/fast_lio/parameter_server.cc
 )
 target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 add_executable(r2live
-    src/apps/estimator_node.cpp
+    apps/r2live_node.cpp
     
-    src/vins/src/parameters.cpp
-    src/vins/src/estimator.cpp
-    src/vins/src/estimator_optimization.cpp
-    src/vins/src/feature_manager.cpp
+    src/vins/parameters.cpp
+    src/vins/estimator.cpp
+    src/vins/estimator_optimization.cpp
+    src/vins/feature_manager.cpp
 
     src/factor/pose_local_parameterization.cpp
     src/factor/projection_factor.cpp
@@ -83,13 +82,13 @@ add_executable(r2live
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
     
-    src/fast_lio/src/fast_lio.cc 
-    src/fast_lio/src/lio_core.cc 
-    src/fast_lio/src/parameter_server.cc
-    src/fast_lio/src/imu_process.cc
-    src/fast_lio/src/pointcloud_ivox_map.cc
-    src/fast_lio/src/pointcloud_ikd_map.cc 
-    src/fast_lio/include/kd_tree/ikd_Tree.cpp
+    src/fast_lio/fast_lio.cc 
+    src/fast_lio/lio_core.cc 
+    src/fast_lio/parameter_server.cc
+    src/fast_lio/imu_process.cc
+    src/fast_lio/pointcloud_ivox_map.cc
+    src/fast_lio/pointcloud_ikd_map.cc 
+    include/fast_lio/kd_tree/ikd_Tree.cpp
     )
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 

@@ -1,4 +1,4 @@
-#include "initial_alignment.h"
+#include "initial/initial_alignment.h"
 
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 {
