@@ -22,7 +22,7 @@
 #include "tools/r2live_sophus/se3.hpp"
 #include "tools/r2live_sophus/so3.hpp"
 
-#include "so3_math.h"
+#include "r2live/so3_math.h"
 
 #define ESTIMATE_GRAVITY 0
 

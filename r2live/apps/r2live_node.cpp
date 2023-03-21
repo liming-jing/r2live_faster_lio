@@ -13,7 +13,7 @@
 #include "vins/parameters.h"
 #include "utility/visualization.h"
 #include "fast_lio/fast_lio.h"
-#include "fast_lio/parameter_server.h"
+#include "fast_lio/r2live/parameter_server.h"
 
 #define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;

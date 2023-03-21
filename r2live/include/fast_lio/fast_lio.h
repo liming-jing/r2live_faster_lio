@@ -22,10 +22,10 @@
 #include "pointcloud_ikd_map.h"
 #include "pointcloud_ivox_map.h"
 #include "lio_core.h"
-#include "parameter_server.h"
-#include "common_lib.h"
+#include "r2live/parameter_server.h"
+#include "r2live/common_lib.h"
 #include "imu_process.h"
-#include "so3_math.h"
+#include "r2live/so3_math.h"
 
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
