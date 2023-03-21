@@ -1,4 +1,5 @@
-#include "parameters.h"
+#include "../include/parameters.h"
+#include <Eigen/Core>
 
 double INIT_DEPTH;
 double MIN_PARALLAX;

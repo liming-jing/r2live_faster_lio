@@ -1,9 +1,9 @@
-#include "estimator.h"
+#include "../include/estimator.h"
 #include <Eigen/Cholesky>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include "tools_ceres.hpp"
-#include "LM_Strategy.hpp"
+#include "../include/LM_Strategy.hpp"
 
 #define USING_CERES_HUBER 0
 extern Camera_Lidar_queue g_camera_lidar_queue;

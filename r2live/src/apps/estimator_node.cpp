@@ -9,11 +9,11 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
-#include "estimator.h"
-#include "parameters.h"
-#include "utility/visualization.h"
-#include "./fast_lio/include/fast_lio.h"
-#include "./fast_lio/include/parameter_server.h"
+#include "../vins/include/estimator.h"
+#include "../vins/include/parameters.h"
+#include "../utility/visualization.h"
+#include "../fast_lio/include/fast_lio.h"
+#include "../fast_lio/include/parameter_server.h"
 
 #define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;

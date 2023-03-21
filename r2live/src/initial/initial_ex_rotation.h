@@ -1,7 +1,7 @@
 #pragma once 
 
 #include <vector>
-#include "../parameters.h"
+#include "../vins/include/parameters.h"
 using namespace std;
 
 #include <opencv2/opencv.hpp>

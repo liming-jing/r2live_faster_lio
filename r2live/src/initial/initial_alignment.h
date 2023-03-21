@@ -5,7 +5,7 @@
 #include "../utility/utility.h"
 #include <ros/ros.h>
 #include <map>
-#include "../feature_manager.h"
+#include "../vins/include/feature_manager.h"
 
 using namespace Eigen;
 using namespace std;

@@ -4,7 +4,7 @@
 #include <eigen3/Eigen/Dense>
 
 #include "../utility/utility.h"
-#include "../parameters.h"
+#include "../vins/include/parameters.h"
 #include "integration_base.h"
 
 #include <ceres/ceres.h>

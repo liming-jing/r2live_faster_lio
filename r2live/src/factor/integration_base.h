@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../utility/utility.h"
-#include "../parameters.h"
+#include "../vins/include/parameters.h"
 #include "tools_eigen.hpp"
 using namespace Eigen;
 

@@ -15,8 +15,8 @@
 #include <tf/transform_broadcaster.h>
 #include "CameraPoseVisualization.h"
 #include <eigen3/Eigen/Dense>
-#include "../estimator.h"
-#include "../parameters.h"
+#include "../vins/include/estimator.h"
+#include "../vins/include/parameters.h"
 #include <fstream>
 #include "tools_eigen.hpp"
 extern ros::Publisher pub_odometry;

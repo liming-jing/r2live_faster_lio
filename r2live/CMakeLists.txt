@@ -63,29 +63,33 @@ add_executable(lio_feat_extract
 target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 add_executable(r2live
-    src/estimator_node.cpp
-    src/parameters.cpp
-    src/estimator.cpp
-    src/estimator_optimization.cpp
-    src/feature_manager.cpp
+    src/apps/estimator_node.cpp
+    
+    src/vins/src/parameters.cpp
+    src/vins/src/estimator.cpp
+    src/vins/src/estimator_optimization.cpp
+    src/vins/src/feature_manager.cpp
+
     src/factor/pose_local_parameterization.cpp
     src/factor/projection_factor.cpp
     src/factor/projection_td_factor.cpp
+
     src/utility/utility.cpp
     src/utility/visualization.cpp
     src/utility/CameraPoseVisualization.cpp
+
     src/initial/solve_5pts.cpp
     src/initial/initial_aligment.cpp
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
-    src/fast_lio/include/kd_tree/ikd_Tree.cpp
-
+    
     src/fast_lio/src/fast_lio.cc 
     src/fast_lio/src/lio_core.cc 
     src/fast_lio/src/parameter_server.cc
     src/fast_lio/src/imu_process.cc
     src/fast_lio/src/pointcloud_ivox_map.cc
     src/fast_lio/src/pointcloud_ikd_map.cc 
+    src/fast_lio/include/kd_tree/ikd_Tree.cpp
     )
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
