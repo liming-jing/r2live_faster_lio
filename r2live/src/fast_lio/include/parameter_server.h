@@ -70,6 +70,9 @@ class ParameterServer {
         inline double GetIvoxGridResolution() const {return ivox_grid_resolution_;}
         inline int GetIvoxNearbyType() const {return ivox_nearby_type_;}
 
+        /* imu process parameters */
+        inline int GetMaxInitCount() const {return max_init_count_;}
+
 
         /* shared parameters */
         inline int GetNumMatchPoints() const {return num_match_points_;}
@@ -100,6 +103,10 @@ class ParameterServer {
         /* pointcloud ivox map parameters*/
         double ivox_grid_resolution_;
         int ivox_nearby_type_;
+
+        /* imu process parameters */
+        // int kMaxInitCount
+        int max_init_count_;
 
         /* share parameters */
         int num_match_points_;

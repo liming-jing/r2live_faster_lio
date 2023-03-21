@@ -27,8 +27,6 @@
 #include "imu_process.h"
 #include "so3_math.h"
 
-const double kInitTime = 0.0f;
-
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
 extern StatesGroup g_lio_state;

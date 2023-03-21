@@ -253,17 +253,15 @@ void LioCore::IEKFUpdateState(Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec)
         g_lio_state.cov = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K_init * H_init) * g_lio_state.cov;
     }
     else {
-        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph" << ANSI_COLOR_RESET << endl;
         auto &&Hsub_T = Hsub.transpose();
         H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
-            (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
+            (H_T_H + (g_lio_state.cov / 0.00015).inverse()).inverse(); 
         K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
 
         auto vec = state_propagat - g_lio_state;
         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
         g_lio_state = state_propagat + solution;
-        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph, vec = " << vec.head<9>().transpose() << ANSI_COLOR_RESET << endl;
 
         rot_add = solution.block<3, 1>(0, 0);
         t_add = solution.block<3, 1>(3, 0);

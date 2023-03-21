@@ -186,7 +186,7 @@ int FastLio::Process()
             continue;
         }
 
-        if ((Measures.lidar_beg_time - first_lidar_time_) < kInitTime)
+        if ((Measures.lidar_beg_time - first_lidar_time_) < 0)
         {
             flg_EKF_inited_ = false;
         }

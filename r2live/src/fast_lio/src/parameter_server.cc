@@ -29,6 +29,9 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "fast_lio/ivox_grid_resolution", ivox_grid_resolution_, 0.5);
     GetROSParameter(nh, "fast_lio/ivox_nearby_type", ivox_nearby_type_, 18);
 
+    /* imu process parameters */
+    GetROSParameter(nh, "fast_lio/max_init_count", max_init_count_, 10);
+
     /* share parameters */
     GetROSParameter(nh, "fast_lio/num_match_points", num_match_points_, 5);
 }

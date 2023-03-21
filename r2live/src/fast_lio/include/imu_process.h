@@ -8,8 +8,7 @@
 #include <Eigen/Eigen>
 
 #include "common_lib.h"
-
-const int kMaxInitCount = 10;
+#include "parameter_server.h"
 
 const double kCovStartAccDiag = 1e-10;
 const double kCovStartGyroDiag = 1e-10;

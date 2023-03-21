@@ -8,8 +8,6 @@
 #include "pointcloud_map_base.h"
 #include "common_lib.h"
 
-#define LASER_POINT_COV (0.00015)    
-
 extern StatesGroup g_lio_state;
 
 class LioCore{

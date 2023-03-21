@@ -59,7 +59,8 @@ void ImuProcess::Process(const MeasureGroup &meas, StatesGroup &stat, PointCloud
         ImuInit(meas, stat, init_iter_num_);
         last_imu_ = meas.imu.back();
 
-        if (init_iter_num_ > kMaxInitCount)
+        int max_init_count = ParameterServer::GetInstance()->GetMaxInitCount(); 
+        if (init_iter_num_ > max_init_count)
         {
             imu_need_init_ = false;
         }
