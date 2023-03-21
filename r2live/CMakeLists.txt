@@ -79,7 +79,6 @@ add_executable(r2live
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
     src/fast_lio/include/kd_tree/ikd_Tree.cpp
-    src/fast_lio/include/FOV_Checker/FOV_Checker.cpp 
 
     src/fast_lio/src/fast_lio.cc 
     src/fast_lio/src/lio_core.cc 
