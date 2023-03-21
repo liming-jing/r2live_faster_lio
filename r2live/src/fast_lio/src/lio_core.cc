@@ -24,7 +24,7 @@ void LioCore::Init()
     I_STATE.setIdentity();
 }
 
-void LioCore::SetMap(PointCloudMapBase* map_base_ptr)
+void LioCore::SetMap(std::shared_ptr<PointCloudMapBase> map_base_ptr)
 {
     map_base_ptr_ = map_base_ptr;
 }

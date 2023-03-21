@@ -111,7 +111,7 @@ private:
     bool flg_exit_ = false;
     std::thread thread_process_;
 
-    PointCloudMapBase* map_base_ptr_;
+    std::shared_ptr<PointCloudMapBase> map_base_ptr_;
     std::shared_ptr<LioCore> lio_core_ptr_;
 
     std::string imu_topic_;

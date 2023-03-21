@@ -17,7 +17,7 @@ class LioCore{
         LioCore();
 
         void SetEKFFlg(bool flg_EKF_inited);
-        void SetMap(PointCloudMapBase* map_base_ptr);
+        void SetMap(std::shared_ptr<PointCloudMapBase> map_base_ptr);
         void Update(PointCloudXYZI::Ptr current_frame);
         inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;};
         std::vector<PointVector>& GetNearestPoints() {return nearest_points_;}
@@ -62,7 +62,7 @@ class LioCore{
         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
         Eigen::MatrixXd K;
     private:
-        PointCloudMapBase* map_base_ptr_;
+        std::shared_ptr<PointCloudMapBase> map_base_ptr_;
 
 };
 

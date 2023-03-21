@@ -37,7 +37,7 @@ void FastLio::Init(ros::NodeHandle& nh)
     downsize_filter_map_.setLeafSize(filter_size_map_min_, filter_size_map_min_, filter_size_map_min_);
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
 
-    map_base_ptr_ = new PointCloudIkdMap();
+    map_base_ptr_ = std::make_shared<PointCloudIkdMap>();
 
     lio_core_ptr_ = std::make_shared<LioCore>();
     lio_core_ptr_->SetMap(map_base_ptr_);
