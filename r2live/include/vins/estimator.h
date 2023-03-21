@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <queue>
 #include <opencv2/core/eigen.hpp>
-#include "fast_lio/r2live/common_lib.h"
+#include "r2live/common_lib.h"
 #include "tools/tools_timer.hpp"
 
 #include "vio_marginalization.hpp"

@@ -57,7 +57,7 @@ include_directories(
 add_executable(lio_feat_extract 
               apps/lio_feature_extract_node.cc
               src/fast_lio/feature_extract.cc
-              src/fast_lio/parameter_server.cc
+              src/r2live/parameter_server.cc
 )
 target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
@@ -84,7 +84,7 @@ add_executable(r2live
     
     src/fast_lio/fast_lio.cc 
     src/fast_lio/lio_core.cc 
-    src/fast_lio/parameter_server.cc
+    src/r2live/parameter_server.cc
     src/fast_lio/imu_process.cc
     src/fast_lio/pointcloud_ivox_map.cc
     src/fast_lio/pointcloud_ikd_map.cc 

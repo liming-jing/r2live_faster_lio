@@ -1,5 +1,5 @@
 #include "utility/CameraPoseVisualization.h"
-#include "fast_lio/r2live/common_lib.h"
+#include "r2live/common_lib.h"
 extern Camera_Lidar_queue g_camera_lidar_queue;
 const Eigen::Vector3d CameraPoseVisualization::imlt = Eigen::Vector3d(-1.0, -0.5, 1.0);
 const Eigen::Vector3d CameraPoseVisualization::imrt = Eigen::Vector3d( 1.0, -0.5, 1.0);

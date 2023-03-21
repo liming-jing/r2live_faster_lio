@@ -8,7 +8,7 @@
 #include "integration_base.h"
 
 #include <ceres/ceres.h>
-#include "fast_lio/r2live/common_lib.h"
+#include "r2live/common_lib.h"
 extern Camera_Lidar_queue g_camera_lidar_queue;
 class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
 {

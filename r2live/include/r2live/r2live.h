@@ -13,7 +13,7 @@
 #include "vins/parameters.h"
 #include "utility/visualization.h"
 #include "fast_lio/fast_lio.h"
-#include "fast_lio/r2live/parameter_server.h"
+#include "r2live/parameter_server.h"
 
 class R2live {
     public:
