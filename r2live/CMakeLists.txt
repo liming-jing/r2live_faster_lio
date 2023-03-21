@@ -86,6 +86,7 @@ add_executable(r2live
     src/fast_lio/src/pointcloud_map.cc 
     src/fast_lio/src/parameter_server.cc
     src/fast_lio/src/imu_process.cc
+    src/fast_lio/src/pointcloud_ivox_map.cc
     )
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 

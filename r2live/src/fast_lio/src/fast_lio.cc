@@ -48,8 +48,11 @@ void FastLio::Init(ros::NodeHandle& nh)
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
 
     lio_core_ptr_ = std::make_shared<LioCore>();
-    point_cloud_map_ptr_ = std::make_shared<PointCloudMap>();
-    lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
+    // point_cloud_map_ptr_ = std::make_shared<PointCloudMap>();
+    point_cloud_ivox_ptr_ = std::make_shared<PointCloudIvoxMap>();
+
+    // lio_core_ptr_->SetPointCloudMap(point_cloud_map_ptr_);
+    lio_core_ptr_->SetPointCloudIvoxMap(point_cloud_ivox_ptr_);
 
     imu_process_ = std::make_shared<ImuProcess>();
     thread_process_ = std::thread(&FastLio::Process, this);
@@ -196,7 +199,7 @@ int FastLio::Process()
             flg_EKF_inited_ = true;
         }
 
-        LasermapFovSegment(g_lio_state.pos_end);
+        // LasermapFovSegment(g_lio_state.pos_end);
         
         downsize_filter_surf_.setInputCloud(feats_undistort_);
         downsize_filter_surf_.filter(*feats_down_);
@@ -204,12 +207,14 @@ int FastLio::Process()
         if (!flg_map_inited_)
         {
             // PointCloudXYZI::Ptr feats_down_updated(new PointCloudXYZI());
-            point_cloud_map_ptr_->InitPointCloudMap(feats_down_);
+            // point_cloud_map_ptr_->InitPointCloudMap(feats_down_);
+            point_cloud_ivox_ptr_->InitPointCloudMap(feats_down_);
             flg_map_inited_ = true;
             continue;
         }
 
-        if (point_cloud_map_ptr_->GetPointsNumFromMap() < 5)
+        // if (point_cloud_map_ptr_->GetPointsNumFromMap() < 5)
+        if (feats_down_->points.size() < 5)
         {
             std::cout << "Insufficient map points, discard update!" << std::endl;
             continue;
@@ -226,7 +231,8 @@ int FastLio::Process()
             PointTypeBodyToWorld(&(feats_down_->points[i]), &(feats_down_updated->points[i]));
         }
     
-        point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray_);
+        // point_cloud_map_ptr_->AddNewPointCloud(feats_down_updated, featsArray_);
+        point_cloud_ivox_ptr_->AddNewPointCloud(feats_down_, lio_core_ptr_->GetNearestPoints(), flg_EKF_inited_);
         PublishData(feats_undistort_, feats_down_);
 
         rate.sleep();
@@ -282,11 +288,11 @@ void FastLio::LasermapFovSegment(Eigen::Vector3d pos)
     local_map_points_ = New_LocalMap_Points;
 
     PointVector points_history;
-    point_cloud_map_ptr_->AcquireRemovedPoints(points_history);
+    // point_cloud_map_ptr_->AcquireRemovedPoints(points_history);
 
     if(cub_needrm_.size() > 0) 
     {
-       point_cloud_map_ptr_->DeletePointBoxes(cub_needrm_);
+    //    point_cloud_map_ptr_->DeletePointBoxes(cub_needrm_);
     }
 }
 
@@ -325,7 +331,7 @@ void FastLio::PublishData(PointCloudXYZI::Ptr feats_undistort, PointCloudXYZI::P
     // 2. 发布有效点云
     PublishEffePoints();
     // 3. 发布地图
-    PublishMap();
+    // PublishMap();
     // 4. 发布里程计
     PublishOdom();
     // 5. tf变换
@@ -382,16 +388,16 @@ void FastLio::PublishEffePoints()
     pub_laser_cloud_effect_.publish(msg);
 }
 
-void FastLio::PublishMap()
-{
-    PointCloudXYZI::Ptr feats_from_map = point_cloud_map_ptr_->GetFeatureMap();
-    sensor_msgs::PointCloud2 laserCloudMap;
-    pcl::toROSMsg(*feats_from_map, laserCloudMap);
+// void FastLio::PublishMap()
+// {
+//     PointCloudXYZI::Ptr feats_from_map = point_cloud_map_ptr_->GetFeatureMap();
+//     sensor_msgs::PointCloud2 laserCloudMap;
+//     pcl::toROSMsg(*feats_from_map, laserCloudMap);
 
-    laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); //ros::Time().fromSec(last_timestamp_lidar);
-    laserCloudMap.header.frame_id = "world";
-    pub_laser_cloud_map_.publish(laserCloudMap);
-}
+//     laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); //ros::Time().fromSec(last_timestamp_lidar);
+//     laserCloudMap.header.frame_id = "world";
+//     pub_laser_cloud_map_.publish(laserCloudMap);
+// }
 
 
 void FastLio::PublishOdom()

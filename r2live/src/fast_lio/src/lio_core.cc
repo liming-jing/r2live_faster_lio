@@ -29,6 +29,11 @@ void LioCore::SetPointCloudMap(std::shared_ptr<PointCloudMap> point_cloud_map)
     point_cloud_map_ = point_cloud_map;
 }
 
+void LioCore::SetPointCloudIvoxMap(std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_map)
+{
+    point_cloud_ivox_map_ = point_cloud_ivox_map;
+}
+
 void LioCore::ReSetData(PointCloudXYZI::Ptr current_frame)
 {
     int points_size = current_frame->points.size();
@@ -154,14 +159,17 @@ void LioCore::Update(PointCloudXYZI::Ptr current_frame)
             if (iter_count_ == 0 || rematch_en_)
             {
                 point_selected_surf_[i] = true;
-                point_cloud_map_->NearestSearch(pointSel_tmpt, num_match_points_, points_near, pointSearchSqDis_surf);
+                // point_cloud_map_->NearestSearch(pointSel_tmpt, num_match_points_, points_near, pointSearchSqDis_surf);
 
-                float max_distance = pointSearchSqDis_surf[num_match_points_ - 1];
+                // float max_distance = pointSearchSqDis_surf[num_match_points_ - 1];
                 
-                if (max_distance > maximum_pt_kdtree_dis_)
-                {
-                    point_selected_surf_[i] = false;
-                }
+                // if (max_distance > maximum_pt_kdtree_dis_)
+                // {
+                //     point_selected_surf_[i] = false;
+                // }
+
+                point_cloud_ivox_map_->NearestSearch(pointSel_tmpt, points_near, num_match_points_);
+                point_selected_surf_[i] = points_near.size() >= num_match_points_ ;
             }
 
             if (point_selected_surf_[i] == false) continue;

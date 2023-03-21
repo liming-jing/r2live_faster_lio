@@ -26,7 +26,8 @@
 #include <geometry_msgs/Vector3.h>
 #include <glog/logging.h>
 
-#include "pointcloud_map.h"
+// #include "pointcloud_map.h"
+#include "pointcloud_ivox_map.h"
 #include "lio_core.h"
 #include "parameter_server.h"
 #include "common_lib.h"
@@ -135,7 +136,8 @@ private:
     bool flg_exit_ = false;
     std::thread thread_process_;
 
-    std::shared_ptr<PointCloudMap> point_cloud_map_ptr_;
+    // std::shared_ptr<PointCloudMap> point_cloud_map_ptr_;
+    std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_ptr_;
     std::shared_ptr<LioCore> lio_core_ptr_;
 
     std::string imu_topic_;
