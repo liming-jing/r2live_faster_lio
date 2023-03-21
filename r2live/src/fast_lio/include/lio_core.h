@@ -8,7 +8,6 @@
 #include "pointcloud_map.h"
 #include "common_lib.h"
 
-#define NUM_MATCH_POINTS (5)
 #define LASER_POINT_COV (0.00015)    
 
 extern StatesGroup g_lio_state;
@@ -45,6 +44,7 @@ class LioCore{
         bool rematch_en_ = false;
         int rematch_num_ = 0;
         int iter_count_ = 0;
+        int num_match_points_ = 0;
 
         PointCloudXYZI::Ptr laser_cloud_ori_;
         PointCloudXYZI::Ptr coeff_sel_;

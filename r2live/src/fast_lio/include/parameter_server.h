@@ -63,6 +63,14 @@ class ParameterServer {
 
         /* feature extract get parameter */
         inline int GetNScans() const {return n_scans_;}
+        
+        /*ivox map parameters*/
+        inline double GetIvoxGridResolution() const {return ivox_grid_resolution_;}
+        inline int GetIvoxNearbyType() const {return ivox_nearby_type_;}
+
+
+        /* shared parameters */
+        inline int GetNumMatchPoints() const {return num_match_points_;}
 
     private:
         /* fast lio parameter */
@@ -85,7 +93,12 @@ class ParameterServer {
         /* feature extract parameter */
         int n_scans_;
 
+        /* pointcloud ivox map parameters*/
+        double ivox_grid_resolution_;
+        int ivox_nearby_type_;
 
+        /* share parameters */
+        int num_match_points_;
 };
 
 #endif

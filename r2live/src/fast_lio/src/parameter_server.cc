@@ -22,7 +22,12 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
 
     /* feature parameters */
-    // nh.param<int>("feature_extraction/N_SCANS", N_SCANS_, 1);
     GetROSParameter(nh,"feature_extraction/N_SCANS", n_scans_, 1800);
+
+    GetROSParameter(nh, "fast_lio/ivox_grid_resolution", ivox_grid_resolution_, 0.5);
+    GetROSParameter(nh, "fast_lio/ivox_nearby_type", ivox_nearby_type_, 18);
+
+    /* share parameters */
+    GetROSParameter(nh, "fast_lio/num_match_points", num_match_points_, 5);
 }
 

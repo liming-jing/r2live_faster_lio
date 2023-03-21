@@ -14,6 +14,7 @@ void LioCore::Init()
     planar_check_dis_ = para_server->GetPlanarCheckDis();
     long_rang_pt_dis_ = para_server->GetLongRangPtDis();
     maximum_res_dis_ = para_server->GetMaximumResDis();
+    num_match_points_ = para_server->GetNumMatchPoints();
 
     laser_cloud_ori_.reset(new PointCloudXYZI());
     coeff_sel_.reset(new PointCloudXYZI());
@@ -55,11 +56,11 @@ void LioCore::PCASolver(PointVector& points_near, double ori_pt_dis,
                         double& maximum_pt_range, const PointType &pointSel_tmpt,
                         int index)
 {
-    cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
-    cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
-    cv::Mat matX0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(0));
+    cv::Mat matA0(num_match_points_, 3, CV_32F, cv::Scalar::all(0));
+    cv::Mat matB0(num_match_points_, 1, CV_32F, cv::Scalar::all(-1));
+    cv::Mat matX0(num_match_points_, 1, CV_32F, cv::Scalar::all(0));
 
-    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+    for (int j = 0; j < num_match_points_; j++)
     {
         matA0.at<float>(j, 0) = points_near[j].x;
         matA0.at<float>(j, 1) = points_near[j].y;
@@ -82,7 +83,7 @@ void LioCore::PCASolver(PointVector& points_near, double ori_pt_dis,
     pd /= ps;
 
     bool planeValid = true;
-    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+    for (int j = 0; j < num_match_points_; j++)
     {           
         // ANCHOR -  Planar check
         if (fabs(pa * points_near[j].x +
@@ -153,9 +154,9 @@ void LioCore::Update(PointCloudXYZI::Ptr current_frame)
             if (iter_count_ == 0 || rematch_en_)
             {
                 point_selected_surf_[i] = true;
-                point_cloud_map_->NearestSearch(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                point_cloud_map_->NearestSearch(pointSel_tmpt, num_match_points_, points_near, pointSearchSqDis_surf);
 
-                float max_distance = pointSearchSqDis_surf[NUM_MATCH_POINTS - 1];
+                float max_distance = pointSearchSqDis_surf[num_match_points_ - 1];
                 
                 if (max_distance > maximum_pt_kdtree_dis_)
                 {
