@@ -28,7 +28,7 @@ class PointCloudIvoxMap {
         void LaserMapFovSegment(Eigen::Vector3d pos) {}
         void InitPointCloudMap(PointCloudXYZI::Ptr cloud);
         void NearestSearch(PointType& point, PointVector& point_near, int k_nearest);
-        void AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points);
+        void AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg);
     private:
         void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
 

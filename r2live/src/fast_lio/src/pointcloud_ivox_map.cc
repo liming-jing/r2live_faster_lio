@@ -40,7 +40,7 @@ void PointCloudIvoxMap::NearestSearch(PointType& point, PointVector& points_near
     ivox_->GetClosestPoint(point, points_near, k_nearest);
 }
 
-void PointCloudIvoxMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points)
+void PointCloudIvoxMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg)
 {
     PointVector points_to_add;
     PointVector point_no_need_downsample;
@@ -56,7 +56,7 @@ void PointCloudIvoxMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<
 
     PointCloudXYZI::Ptr cloud_world(new PointCloudXYZI(*cloud));
 
-    bool flg = ParameterServer::GetInstance()->GetFlgEKFInited();
+    // bool flg = ParameterServer::GetInstance()->GetFlgEKFInited();
     double filter_size_map_min = ParameterServer::GetInstance()->GetFilterSizeMapMin();
     int num_match_points = ParameterServer::GetInstance()->GetNumMatchPoints();
 
