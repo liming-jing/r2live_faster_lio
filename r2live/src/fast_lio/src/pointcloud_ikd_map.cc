@@ -1,12 +1,12 @@
 #include "pointcloud_ikd_map.h"
 
 
-PointCloudMap::PointCloudMap() 
+PointCloudIkdMap::PointCloudIkdMap() 
 {
     Init();
 }
 
-void PointCloudMap::Init()
+void PointCloudIkdMap::Init()
 {
     ParameterServer* para_server = ParameterServer::GetInstance();
     filter_size_map_min_ = para_server->GetFilterSizeMapMin();
@@ -18,7 +18,7 @@ void PointCloudMap::Init()
     x_axis_point_world_ = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
 }
 
-void PointCloudMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
+void PointCloudIkdMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
 {
     if (ikdtree_.Root_Node == nullptr)
     {
@@ -28,7 +28,7 @@ void PointCloudMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
     std::cout << "Ikdtree initialization succeeded" << std::endl;
 }
 
-int PointCloudMap::DeletePointBoxes(std::vector<BoxPointType>& cub_needrm)
+int PointCloudIkdMap::DeletePointBoxes(std::vector<BoxPointType>& cub_needrm)
 {
     int kdtree_delete_counter = 0;
     if (ikdtree_.Root_Node != nullptr)
@@ -40,7 +40,7 @@ int PointCloudMap::DeletePointBoxes(std::vector<BoxPointType>& cub_needrm)
     }
     return kdtree_delete_counter;
 }
-void PointCloudMap::AddPointBoxes(std::vector<BoxPointType>& cub_needad)
+void PointCloudIkdMap::AddPointBoxes(std::vector<BoxPointType>& cub_needad)
 {
     if (ikdtree_.Root_Node != nullptr)
     {
@@ -50,7 +50,7 @@ void PointCloudMap::AddPointBoxes(std::vector<BoxPointType>& cub_needad)
         std::cerr << "Ikdtree not initialized" << std::endl;
     }
 }
-void PointCloudMap::AddPoints(PointCloudXYZI::Ptr cube_points_add)
+void PointCloudIkdMap::AddPoints(PointCloudXYZI::Ptr cube_points_add)
 {
     if (ikdtree_.Root_Node != nullptr)
     {
@@ -61,7 +61,7 @@ void PointCloudMap::AddPoints(PointCloudXYZI::Ptr cube_points_add)
     }
 }
 
-void PointCloudMap::AcquireRemovedPoints(PointVector& points_history)
+void PointCloudIkdMap::AcquireRemovedPoints(PointVector& points_history)
 {
     if (ikdtree_.Root_Node != nullptr)
     {
@@ -72,7 +72,7 @@ void PointCloudMap::AcquireRemovedPoints(PointVector& points_history)
     }
 }
 
-int PointCloudMap::GetPointsNumFromMap()
+int PointCloudIkdMap::GetPointsNumFromMap()
 {
     if (ikdtree_.Root_Node != nullptr)
     {
@@ -84,7 +84,7 @@ int PointCloudMap::GetPointsNumFromMap()
     }
 }
 
-void PointCloudMap::NearestSearch(PointType & point, PointVector& points_near, int k_nearest, bool& point_selected_surf)
+void PointCloudIkdMap::NearestSearch(PointType & point, PointVector& points_near, int k_nearest, bool& point_selected_surf)
 {
      if (ikdtree_.Root_Node != nullptr)
     {
@@ -103,14 +103,14 @@ void PointCloudMap::NearestSearch(PointType & point, PointVector& points_near, i
     }
 }
 
-void PointCloudMap::SetCenWidthHeightDepth(int width, int height, int depth)
+void PointCloudIkdMap::SetCenWidthHeightDepth(int width, int height, int depth)
 {
     laser_cloud_cen_width_ = width;
     laser_cloud_cen_height_ = height;
     laser_cloud_cen_depth_ = depth;
 }
 
-void PointCloudMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg)
+void PointCloudIkdMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg)
 {
     PointVector points_history;
     ikdtree_.acquire_removed_points(points_history);
@@ -151,7 +151,7 @@ void PointCloudMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<Poin
     ikdtree_.Add_Points(feats_down_updated->points, true);
 }
 
-void PointCloudMap::LaserMapFovSegment(Eigen::Vector3d pos)
+void PointCloudIkdMap::LaserMapFovSegment(Eigen::Vector3d pos)
 {
     cub_needrm_.clear();
     static float Mov_DetRange_result = kMovThreshold * kDetRange;
@@ -207,7 +207,7 @@ void PointCloudMap::LaserMapFovSegment(Eigen::Vector3d pos)
     }
 }
 
-PointCloudXYZI::Ptr PointCloudMap::GetFeatureMap()
+PointCloudXYZI::Ptr PointCloudIkdMap::GetFeatureMap()
 {
     PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
     PointVector().swap(ikdtree_.PCL_Storage);
@@ -217,7 +217,7 @@ PointCloudXYZI::Ptr PointCloudMap::GetFeatureMap()
     return featsFromMap;
 }
 
-void PointCloudMap::PointTypeBodyToWorld(PointType const *const pi, PointType *const po)
+void PointCloudIkdMap::PointTypeBodyToWorld(PointType const *const pi, PointType *const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
     Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);

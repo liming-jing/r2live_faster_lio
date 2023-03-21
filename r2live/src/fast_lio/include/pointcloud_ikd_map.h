@@ -12,11 +12,11 @@ const int kLaserCloudNum = kLaserCloudWidth * kLaserCloudHeight * kLaserCloudDep
 const float kMovThreshold = 1.5f;
 const float kDetRange = 300.0f;
 
-class PointCloudMap: public PointCloudMapBase {
+class PointCloudIkdMap: public PointCloudMapBase {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     public:
-        PointCloudMap();
+        PointCloudIkdMap();
         virtual void InitPointCloudMap(PointCloudXYZI::Ptr cloud) override;
         virtual void LaserMapFovSegment(Eigen::Vector3d pos) override;
         virtual void NearestSearch(PointType & point, PointVector& points_near, int num, bool& point_selected_surf) override;

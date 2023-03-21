@@ -26,7 +26,8 @@
 #include <geometry_msgs/Vector3.h>
 #include <glog/logging.h>
 
-// #include "pointcloud_map.h"
+#include "pointcloud_map_base.h"
+#include "pointcloud_ikd_map.h"
 #include "pointcloud_ivox_map.h"
 #include "lio_core.h"
 #include "parameter_server.h"
@@ -34,12 +35,12 @@
 #include "imu_process.h"
 #include "so3_math.h"
 
-const int laserCloudWidth = 48;
-const int laserCloudHeight = 48;
-const int laserCloudDepth = 48;
-const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
-const float kMovThreshold = 1.5f;
-const float kDetRange = 300.0f;
+// const int laserCloudWidth = 48;
+// const int laserCloudHeight = 48;
+// const int laserCloudDepth = 48;
+// const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
+// const float kMovThreshold = 1.5f;
+// const float kDetRange = 300.0f;
 const double kInitTime = 0.0f;
 
 extern Camera_Lidar_queue g_camera_lidar_queue;
@@ -110,11 +111,11 @@ private:
     double cube_len_ = 0.0;
     double FOV_DEG = 0.0;
    
-    PointCloudXYZI::Ptr featsArray_[laserCloudNum];
+    // PointCloudXYZI::Ptr featsArray_[laserCloudNum];
 
-    std::vector<BoxPointType> cub_needrm_;
+    // std::vector<BoxPointType> cub_needrm_;
 
-    BoxPointType local_map_points_;
+    // BoxPointType local_map_points_;
     bool local_map_init_;
 
     PointCloudXYZI::Ptr feats_undistort_;
@@ -136,8 +137,10 @@ private:
     bool flg_exit_ = false;
     std::thread thread_process_;
 
-    // std::shared_ptr<PointCloudMap> point_cloud_map_ptr_;
-    std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_ptr_;
+    // std::shared_ptr<PointCloudIkdMap> point_cloud_map_ptr_;
+    // std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_ptr_;
+    // std::shared_ptr<PointCloudMapBase> map_base_ptr_;
+    PointCloudMapBase* map_base_ptr_;
     std::shared_ptr<LioCore> lio_core_ptr_;
 
     std::string imu_topic_;

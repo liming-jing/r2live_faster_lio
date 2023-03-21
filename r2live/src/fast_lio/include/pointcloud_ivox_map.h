@@ -25,6 +25,13 @@ class PointCloudIvoxMap : public PointCloudMapBase {
     private:
         void Init();
         void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
+        
+        inline float calc_dist(const PointType &p1, const PointType &p2) 
+        {
+            return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y) + (p1.z - p2.z) * (p1.z - p2.z);
+        }
+
+        inline float calc_dist(const Eigen::Vector3f &p1, const Eigen::Vector3f &p2) { return (p1 - p2).squaredNorm(); }
     
     private:
 

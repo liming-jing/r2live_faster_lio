@@ -5,8 +5,9 @@
 #include <memory>
 #include <glog/logging.h>
 #include "parameter_server.h"
-#include "pointcloud_map.h"
-#include "pointcloud_ivox_map.h"
+// #include "pointcloud_map.h"
+// #include "pointcloud_ivox_map.h"
+#include "pointcloud_map_base.h"
 #include "common_lib.h"
 
 #define LASER_POINT_COV (0.00015)    
@@ -18,8 +19,7 @@ class LioCore{
         LioCore();
 
         void SetEKFFlg(bool flg_EKF_inited);
-        void SetPointCloudMap(std::shared_ptr<PointCloudMap> point_cloud_map);
-        void SetPointCloudIvoxMap(std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_map);
+        void SetMap(PointCloudMapBase* map_base_ptr);
         void Update(PointCloudXYZI::Ptr current_frame);
         inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;};
         std::vector<PointVector>& GetNearestPoints() {return nearest_points_;}
@@ -64,8 +64,9 @@ class LioCore{
         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
         Eigen::MatrixXd K;
     private:
-        std::shared_ptr<PointCloudMap> point_cloud_map_;
-        std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_map_;
+        // std::shared_ptr<PointCloudIkdMap> point_cloud_map_;
+        // std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_map_;
+        PointCloudMapBase* map_base_ptr_;
 
 };
 
