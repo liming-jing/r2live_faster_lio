@@ -21,11 +21,10 @@ class PointCloudIvoxMap : public PointCloudMapBase {
         virtual void InitPointCloudMap(PointCloudXYZI::Ptr cloud) override;
         virtual void NearestSearch(PointType& point, PointVector& point_near, int k_nearest, bool& point_selected_surf) override;
         virtual void AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg) override;
-        int GetEffectPointsInMap();
     private:
         void Init();
         void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
-        
+
         inline float calc_dist(const PointType &p1, const PointType &p2) 
         {
             return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y) + (p1.z - p2.z) * (p1.z - p2.z);

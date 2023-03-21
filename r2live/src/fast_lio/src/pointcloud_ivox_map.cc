@@ -107,12 +107,6 @@ void PointCloudIvoxMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<
     ivox_->AddPoints(point_no_need_downsample);
 }
 
-int PointCloudIvoxMap::GetEffectPointsInMap()
-{
-    return ivox_->NumValidGrids();
-}
-
-
 void PointCloudIvoxMap::PointTypeBodyToWorld(PointType const *const pi, PointType *const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);

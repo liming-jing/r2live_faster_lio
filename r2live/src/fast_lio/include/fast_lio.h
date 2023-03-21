@@ -35,12 +35,6 @@
 #include "imu_process.h"
 #include "so3_math.h"
 
-// const int laserCloudWidth = 48;
-// const int laserCloudHeight = 48;
-// const int laserCloudDepth = 48;
-// const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
-// const float kMovThreshold = 1.5f;
-// const float kDetRange = 300.0f;
 const double kInitTime = 0.0f;
 
 extern Camera_Lidar_queue g_camera_lidar_queue;
@@ -74,18 +68,8 @@ private:
     void PublishPath();
     
 private:
-    template <typename T>
-    void PointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
-    {
-        Eigen::Vector3d p_body(pi[0], pi[1], pi[2]);
-        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
-        po[0] = p_global(0);
-        po[1] = p_global(1);
-        po[2] = p_global(2);
-    }
 
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
-    void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
     void ChangeFormatData(nav_msgs::Odometry& odomAftMapped,const Eigen::Vector3d& euler_cur);
 public:
     std::mutex mutex_lio_process_;
@@ -110,19 +94,9 @@ private:
     bool flg_EKF_inited_ = false;
     double cube_len_ = 0.0;
     double FOV_DEG = 0.0;
-   
-    // PointCloudXYZI::Ptr featsArray_[laserCloudNum];
-
-    // std::vector<BoxPointType> cub_needrm_;
-
-    // BoxPointType local_map_points_;
-    bool local_map_init_;
 
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;
-
-    Eigen::Vector3f x_axis_point_body_; //(LIDAR_SP_LEN, 0.0, 0.0);
-    Eigen::Vector3f x_axis_point_world_; //(LIDAR_SP_LEN, 0.0, 0.0);
 
     nav_msgs::Path path_;
 
@@ -137,9 +111,6 @@ private:
     bool flg_exit_ = false;
     std::thread thread_process_;
 
-    // std::shared_ptr<PointCloudIkdMap> point_cloud_map_ptr_;
-    // std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_ptr_;
-    // std::shared_ptr<PointCloudMapBase> map_base_ptr_;
     PointCloudMapBase* map_base_ptr_;
     std::shared_ptr<LioCore> lio_core_ptr_;
 

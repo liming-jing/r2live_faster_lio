@@ -5,8 +5,6 @@
 #include <memory>
 #include <glog/logging.h>
 #include "parameter_server.h"
-// #include "pointcloud_map.h"
-// #include "pointcloud_ivox_map.h"
 #include "pointcloud_map_base.h"
 #include "common_lib.h"
 
@@ -64,8 +62,6 @@ class LioCore{
         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
         Eigen::MatrixXd K;
     private:
-        // std::shared_ptr<PointCloudIkdMap> point_cloud_map_;
-        // std::shared_ptr<PointCloudIvoxMap> point_cloud_ivox_map_;
         PointCloudMapBase* map_base_ptr_;
 
 };
