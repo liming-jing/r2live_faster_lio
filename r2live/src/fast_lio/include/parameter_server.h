@@ -61,6 +61,8 @@ class ParameterServer {
         inline double GetLongRangPtDis() const {return long_rang_pt_dis_;}
         inline bool GetIfPublishFeatureMap() const {return if_publish_feature_map_;}
 
+        inline std::string GetMapMethod() const {return map_method_;}
+
         /* feature extract get parameter */
         inline int GetNScans() const {return n_scans_;}
         
@@ -89,6 +91,8 @@ class ParameterServer {
         double planar_check_dis_;
         double long_rang_pt_dis_;
         bool if_publish_feature_map_;
+
+        std::string map_method_;
 
         /* feature extract parameter */
         int n_scans_;

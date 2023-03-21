@@ -5,7 +5,7 @@ ParameterServer* ParameterServer::instance = nullptr;
 void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
 {
     /*fast_lio parameters*/
-    nh.param<std::string>("imu_topic", imu_topic_, "/livox/imu");
+    GetROSParameter(nh, "imu_topic", imu_topic_, std::string("/livox/imu"));
     GetROSParameter(nh, "fast_lio/dense_map_enable", dense_map_en_, true);
     GetROSParameter(nh, "fast_lio/lidar_time_delay", lidar_time_delay_, 0.0);
     GetROSParameter(nh, "fast_lio/max_iteration", num_max_iterations_, 4);
@@ -20,6 +20,8 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "fast_lio/planar_check_dis", planar_check_dis_, 0.05);
     GetROSParameter(nh, "fast_lio/long_rang_pt_dis", long_rang_pt_dis_, 50.0);
     GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
+
+    GetROSParameter(nh, "fast_lio/map_method", map_method_, std::string("ivox"));
 
     /* feature parameters */
     GetROSParameter(nh,"feature_extraction/N_SCANS", n_scans_, 1800);
