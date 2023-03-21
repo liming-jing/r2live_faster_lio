@@ -23,8 +23,7 @@
 
     <node pkg="r2live" type="lio_feat_extract" name="lio_feat_extract"  output="log"/>
     <!-- <node pkg="r2live" type="lio_feat_extract" name="lio_feat_extract"  output="screen"/> -->
-
-
+    
     <!-- 注意imu的topic -->
     <group if="1">
         <node name="r2live" pkg="r2live" type="r2live" output="screen">
