@@ -41,7 +41,7 @@ void PointCloudIvoxMap::NearestSearch(PointType& point, PointVector& points_near
 {
     ivox_->GetClosestPoint(point, points_near, k_nearest);
     
-    point_selected_surf = points_near.size() > k_nearest;
+    point_selected_surf = points_near.size() >= k_nearest;
 }
 
 void PointCloudIvoxMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg)

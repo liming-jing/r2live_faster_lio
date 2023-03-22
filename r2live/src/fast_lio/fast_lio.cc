@@ -40,11 +40,11 @@ void FastLio::Init(ros::NodeHandle& nh)
     if (para_server->GetMapMethod() == "ivox")
     {
         LOG(INFO) << "Map is ivox";
-        map_base_ptr_ = std::make_shared<PointCloudIkdMap>();
+        map_base_ptr_ = std::make_shared<PointCloudIvoxMap>();
     }
     else {
         LOG(INFO) << "Map is ikd_tree";
-        map_base_ptr_ = std::make_shared<PointCloudIvoxMap>();
+        map_base_ptr_ = std::make_shared<PointCloudIkdMap>();
     }
 
     lio_core_ptr_ = std::make_shared<LioCore>();
