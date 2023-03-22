@@ -1,0 +1,7 @@
+r2live:
+  if_write_to_bag: false
+  if_dump_log: false
+  acc_mul_G: false
+  lidar_drag_cam_tim: 10
+  if_lidar_start_first: true
+  test: "hello world ==> jlm"

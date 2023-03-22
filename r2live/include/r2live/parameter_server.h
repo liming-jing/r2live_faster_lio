@@ -77,6 +77,14 @@ class ParameterServer {
         /* shared parameters */
         inline int GetNumMatchPoints() const {return num_match_points_;}
 
+
+        /* vio parameters */
+        inline double GetLidarDragCamTim() const {return lidar_drag_cam_tim_;}
+        inline bool GetIfAccMulG() const {return if_acc_mul_G_;}
+        inline bool GetIfLidarStartFirst() const {return if_lidar_start_first_;}
+        inline bool GetIfWriteRes2Bag() const {return if_write_res_2_bag_;}
+        inline bool GetIfDumpLog() const {return if_dump_log_;}
+
     private:
         /* fast lio parameter */
         std::string imu_topic_;
@@ -110,6 +118,15 @@ class ParameterServer {
 
         /* share parameters */
         int num_match_points_;
+
+        /* vio parameters */
+
+        double lidar_drag_cam_tim_;
+        bool if_acc_mul_G_;
+        bool if_lidar_start_first_;
+        bool if_write_res_2_bag_;
+        bool if_dump_log_;
+        // std::string bag_file_name_;
 };
 
 #endif

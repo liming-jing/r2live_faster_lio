@@ -34,5 +34,16 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
 
     /* share parameters */
     GetROSParameter(nh, "fast_lio/num_match_points", num_match_points_, 5);
+
+
+    /* vio parameters */
+    GetROSParameter(nh, "r2live/lidar_drag_cam_tim", lidar_drag_cam_tim_, 1.0);
+    GetROSParameter(nh, "r2live/acc_mul_G", if_acc_mul_G_, false);
+    GetROSParameter(nh, "r2live/if_lidar_start_first", if_lidar_start_first_, false);
+    GetROSParameter(nh, "r2live/if_write_to_bag",if_write_res_2_bag_, false);
+    GetROSParameter(nh, "r2live/if_dump_log", if_dump_log_, false);
+
+    std::string test;
+    GetROSParameter(nh, "r2live/test", test, std::string("mei you du dao!!!"));
 }
 
