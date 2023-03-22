@@ -21,14 +21,14 @@ void R2live::Init(ros::NodeHandle& nh)
     readParameters(nh);
     estimator_.setParameter();
 
-    GetROSParameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
-    GetROSParameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
-    GetROSParameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
-    GetROSParameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
-    GetROSParameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
-    GetROSParameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
+    ParameterServer* para_server = ParameterServer::GetInstance();
+    g_camera_lidar_queue.m_lidar_drag_cam_tim = para_server->GetLidarDragCamTim();
+    g_camera_lidar_queue.m_if_acc_mul_G = para_server->GetIfAccMulG();
+    g_camera_lidar_queue.m_if_lidar_start_first = para_server->GetIfLidarStartFirst();
+    g_camera_lidar_queue.m_if_dump_log = para_server->GetIfDumpLog();
 
     g_camera_lidar_queue.m_if_lidar_can_start = false;
+
     if (estimator_.m_fast_lio_instance == nullptr)
     {
         estimator_.m_fast_lio_instance = new FastLio(nh);
@@ -113,8 +113,10 @@ void R2live::RestartCallback(const std_msgs::BoolConstPtr &restart_msg)
         buf_mutex_.unlock();
 
         estimator_mutex_.lock();
+
         estimator_.clearState();
         estimator_.setParameter();
+        
         estimator_mutex_.unlock();
         current_time_ = -1;
         last_imu_t_ = 0;

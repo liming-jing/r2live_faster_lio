@@ -42,8 +42,5 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "r2live/if_lidar_start_first", if_lidar_start_first_, false);
     GetROSParameter(nh, "r2live/if_write_to_bag",if_write_res_2_bag_, false);
     GetROSParameter(nh, "r2live/if_dump_log", if_dump_log_, false);
-
-    std::string test;
-    GetROSParameter(nh, "r2live/test", test, std::string("mei you du dao!!!"));
 }
 
