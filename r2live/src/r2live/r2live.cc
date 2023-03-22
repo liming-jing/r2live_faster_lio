@@ -47,6 +47,7 @@ void R2live::Init(ros::NodeHandle& nh)
     diff_vins_lio_t_ = vec_3::Zero();
 }
 
+
 void R2live::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     sensor_msgs::ImuPtr imu_ptr = boost::make_shared<sensor_msgs::Imu>();
@@ -130,6 +131,9 @@ void R2live::RelocalizationCallback(const sensor_msgs::PointCloudConstPtr &point
     buf_mutex_.unlock();
 }
 
+/**
+ * IMU数据递推，获得高频的IMU里程计
+*/
 void R2live::Predict(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -242,9 +246,10 @@ void R2live::UnLockLio(Estimator &estimator)
 
 void R2live::SyncLio2Vio(Estimator &estimator)
 {
-    check_state(g_lio_state);
-    int frame_idx = estimator.frame_count;
-    frame_idx = WINDOW_SIZE;
+    // 该函数只是检查系统的状态，而没有实际用使用
+    check_state(g_lio_state); 
+
+    int frame_idx = WINDOW_SIZE;
     if (abs(g_camera_lidar_queue.m_last_visual_time - g_lio_state.last_update_time) < 1.0)
     {
         if (g_lio_state.bias_a.norm() < 0.5 && g_lio_state.bias_g.norm() < 1.0)
@@ -377,6 +382,14 @@ void R2live::ConstructCameraMeasure(int frame_idx, Estimator &estimator,
     }
 }
 
+
+/*
+    VIO的主线程
+    等待并获取measurements：(IMUs, img_msg)s，计算dt
+    estimator.processIMU()进行IMU预积分
+    estimator.setReloFrame()设置重定位帧
+    estimator.processImage()处理图像帧：初始化，紧耦合的非线性优化
+*/
 void R2live::Process()
 {
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
@@ -387,6 +400,7 @@ void R2live::Process()
     /* 注意这里的变量 */
     std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
+    // 初始化为true
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
 
@@ -407,37 +421,48 @@ void R2live::Process()
         estimator_mutex_.lock();
 
         g_camera_lidar_queue.m_last_visual_time = -3e8;
+
         TicToc t_s;
         for (auto &measurement : measurements)
         {
             auto img_msg = measurement.second;
-            int if_camera_can_update = 1;
+
             double cam_update_tim = img_msg->header.stamp.toSec() + estimator_.td;
         
             if (estimator_.m_fast_lio_instance != nullptr)
             {
                 g_camera_lidar_queue.m_camera_imu_td = estimator_.td;
                 g_camera_lidar_queue.m_last_visual_time = img_msg->header.stamp.toSec();
+
+
+                 // 根据Lidar和相机的时间戳大小，判断先处理哪个传感器的数据
                 while (g_camera_lidar_queue.if_camera_can_process() == false)
                 {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 }
 
+                // 这里先处理相机的数据，锁住Lidar处理过程。
                 LockLio(estimator_);
+
                 t_s.tic();
-                double camera_LiDAR_tim_diff = img_msg->header.stamp.toSec() + g_camera_lidar_queue.m_camera_imu_td - g_lio_state.last_update_time;
-                // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
+                
                 p_imu = estimator_.m_fast_lio_instance->imu_process_;
             }
 
-            if ((g_camera_lidar_queue.m_if_lidar_can_start == true) && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))
+            // 这里一直为真
+            if ((g_camera_lidar_queue.m_if_lidar_can_start == true)         // while循环前 从配置文件获取的数据，为true
+                 && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))       // 从配置文件获得的数据，为10
             {
                 state_mutex_.lock();
-                SyncLio2Vio(estimator_);
+                SyncLio2Vio(estimator_); 
                 state_mutex_.unlock();
             }
+
+
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
             int skip_imu = 0;
+
+            // 1. 对IMU数据预积分
             for (auto &imu_msg : measurement.first)
             {
                 double t = imu_msg->header.stamp.toSec();
@@ -477,7 +502,8 @@ void R2live::Process()
                     estimator_.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                 }
             }
-            // set relocalization frame
+
+            // 2. 判断系统是否产生回环
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
             while (!relo_buf_.empty())
             {
@@ -510,6 +536,7 @@ void R2live::Process()
             std::deque<sensor_msgs::Imu::ConstPtr> imu_queue;
             int total_IMU_cnt = 0;
             int acc_IMU_cnt = 0;
+            // 统计LIO系统状态更新后的IMU数据
             for (auto &imu_msg : measurement.first)
             {
                 total_IMU_cnt++;
@@ -531,15 +558,22 @@ void R2live::Process()
                 double start_dt = g_lio_state.last_update_time - imu_queue.front()->header.stamp.toSec();
                 double end_dt = cam_update_tim - imu_queue.back()->header.stamp.toSec();
                 esikf_update_valid = true;
-                if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR))
+
+                if (g_camera_lidar_queue.m_if_have_lidar_data   //只要历史上收到过一帧lidar数据，m_if_have_lidar_data就会被置位为1。
+                    && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR))
                 {
-                    // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
                     p_imu = estimator_.m_fast_lio_instance->imu_process_;
+
+                    // imu预测
                     state_aft_integration = p_imu->ImuPreintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
+
+                    // 更新系统的状态 
                     estimator_.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
                     
                     diff_vins_lio_q_ = eigen_q(estimator_.Rs[WINDOW_SIZE].transpose() * state_aft_integration.rot_end);
                     diff_vins_lio_t_ = state_aft_integration.pos_end - estimator_.Ps[WINDOW_SIZE];
+
+
                     if (diff_vins_lio_t_.norm() > 1.0)
                     {
                         // ROS_INFO("VIO subsystem restart ");
@@ -547,8 +581,8 @@ void R2live::Process()
                         diff_vins_lio_q_.setIdentity();
                         diff_vins_lio_t_.setZero();
                     }
-                    if ((start_dt > -0.02) &&
-                        (fabs(end_dt) < 0.02))
+
+                    if ((start_dt > -0.02) && (fabs(end_dt) < 0.02))
                     {
                         g_lio_state = state_aft_integration;
                         g_lio_state.last_update_time = cam_update_tim;
@@ -586,17 +620,22 @@ void R2live::Process()
             }
             // t_s.tic();
             estimator_.processImage(image, img_msg->header);
-            // estimator.vector2double();
+            
+
             //Step 1: IMU preintergration
             StatesGroup state_prediction = state_aft_integration;
 
-            // //Step 3: ESIKF udpate.
+            // Step 3: ESIKF udpate.
             double mean_reprojection_error = 0.0;
             int minmum_number_of_camera_res = 10;
             
             StatesGroup state_before_esikf = g_lio_state;
-            if (esikf_update_valid && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR) 
-                && (g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim)
+
+            // 只有当vio初始化完成之后，并且lio更新系统状态的时间超过vio初始化的时间10s，才进行vio的滤波
+            if (esikf_update_valid 
+                && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR) 
+                && (g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time 
+                    > g_camera_lidar_queue.m_lidar_drag_cam_tim)     // 上一次更新状态的时间 - 视觉初始化时间 > 设置的阈值10s
                 )
             {
                 estimator_.vector2double();
@@ -679,6 +718,8 @@ void R2live::Process()
                     deltaR = rot_add.norm() * 57.3;
                     deltaT = t_add.norm() ;
                 }
+
+                // 如果构造残差个数足够，说明进行了iekf，那么就判断迭代结果是否满足要求
                 if (reppro_err_vec.size() >= minmum_number_of_camera_res)
                 {
                     G.setZero();

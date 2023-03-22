@@ -56,7 +56,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         int feature_id = id_pts.first;
         auto it = find_if(feature.begin(), feature.end(), [feature_id](const FeaturePerId &it)
                           {
-            return it.feature_id == feature_id;
+                            return it.feature_id == feature_id;
                           });
 
         if (it == feature.end())
