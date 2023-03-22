@@ -6,6 +6,7 @@
 #include <string>
 #include <mutex>
 #include "common_lib.h"
+#include <glog/logging.h>
 
 class ParameterServer {
     private:
