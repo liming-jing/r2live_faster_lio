@@ -116,7 +116,7 @@ void R2live::RestartCallback(const std_msgs::BoolConstPtr &restart_msg)
 
         estimator_.clearState();
         estimator_.setParameter();
-        
+
         estimator_mutex_.unlock();
         current_time_ = -1;
         last_imu_t_ = 0;
@@ -189,7 +189,6 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
 R2live::GetMeasurements()
 {
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
-    std::unique_lock<std::mutex> lk(buf_mutex_);
     while (true)
     {
         if (imu_buf_.empty() || feature_buf_.empty())
@@ -384,18 +383,27 @@ void R2live::Process()
     G.setZero();
     H_T_H.setZero();
     I_STATE.setIdentity();
+
+    /* 注意这里的变量 */
     std::shared_ptr<ImuProcess> p_imu(new ImuProcess());
 
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
+
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
-        measurements = GetMeasurements();
-        if(measurements.size() == 0)
-        {
-            continue;
-        }
+        std::unique_lock<std::mutex> lk(buf_mutex_);
+        con_.wait(lk, [&](){
+            measurements = GetMeasurements();
+            if (measurements.size() != 0)
+            {
+                return true;
+            }
+            return false;
+        });
+        lk.unlock();
+
         estimator_mutex_.lock();
 
         g_camera_lidar_queue.m_last_visual_time = -3e8;
