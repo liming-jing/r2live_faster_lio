@@ -1,67 +1,144 @@
-#include <stdio.h>
-#include <time.h>
-#include <queue>
-#include <map>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <ros/ros.h>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
+#include "r2live/r2live.h"
 
-#include "vins/estimator.h"
-#include "vins/parameters.h"
-#include "utility/visualization.h"
-#include "fast_lio/fast_lio.h"
-#include "r2live/parameter_server.h"
-
-#define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;
-MeasureGroup Measures;
 StatesGroup g_lio_state;
-std::string sys_time;
+MeasureGroup Measures;
 
-Estimator estimator;
-
-std::condition_variable con;
-double current_time = -1;
-queue<sensor_msgs::ImuConstPtr> imu_buf;
-queue<sensor_msgs::PointCloudConstPtr> feature_buf;
-queue<sensor_msgs::PointCloudConstPtr> relo_buf;
-int sum_of_wait = 0;
-
-std::mutex m_buf;
-std::mutex m_state;
-std::mutex i_buf;
-std::mutex m_estimator;
-
-double latest_time;
-Eigen::Vector3d tmp_P;
-Eigen::Quaterniond tmp_Q;
-Eigen::Vector3d tmp_V;
-Eigen::Vector3d tmp_Ba;
-Eigen::Vector3d tmp_Bg;
-Eigen::Vector3d acc_0;
-Eigen::Vector3d gyr_0;
-
-eigen_q diff_vins_lio_q = eigen_q::Identity();
-vec_3 diff_vins_lio_t = vec_3::Zero();
-
-bool init_feature = 0;
-bool init_imu = 1;
-double last_imu_t = -1;
-
-void predict(const sensor_msgs::ImuConstPtr &imu_msg)
+R2live::R2live(ros::NodeHandle& nh)
 {
-    double t = imu_msg->header.stamp.toSec();
-    if (init_imu)
+    Init(nh);
+
+    sub_imu_ = nh.subscribe(IMU_TOPIC, 20000, &R2live::ImuCallback, this, ros::TransportHints().tcpNoDelay());
+    sub_image_ = nh.subscribe("/feature_tracker/feature", 20000, &R2live::FeatureCallback, this, ros::TransportHints().tcpNoDelay());
+    sub_restart_ = nh.subscribe("/feature_tracker/restart", 20000, &R2live::RestartCallback, this, ros::TransportHints().tcpNoDelay());
+    sub_relo_points_ = nh.subscribe("/pose_graph/match_points", 20000, &R2live::RelocalizationCallback, this, ros::TransportHints().tcpNoDelay());
+
+    measurement_process_ = std::thread(&R2live::Process, this);
+}
+
+void R2live::Init(ros::NodeHandle& nh)
+{
+    readParameters(nh);
+    estimator_.setParameter();
+
+    GetROSParameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
+    GetROSParameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
+    GetROSParameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
+    GetROSParameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
+    GetROSParameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
+    GetROSParameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
+
+    g_camera_lidar_queue.m_if_lidar_can_start = false;
+    if (estimator_.m_fast_lio_instance == nullptr)
     {
-        latest_time = t;
-        init_imu = 0;
+        estimator_.m_fast_lio_instance = new FastLio(nh);
+    }
+
+    registerPub(nh);
+
+    last_imu_t_ = -1;
+    current_time_ = -1;
+    latest_time_ = 0;
+    init_feature_ = false;
+    init_imu_ = true;
+    sum_of_wait_ = 0;
+
+    diff_vins_lio_q_ = eigen_q::Identity();
+    diff_vins_lio_t_ = vec_3::Zero();
+}
+
+void R2live::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msg)
+{
+    sensor_msgs::ImuPtr imu_ptr = boost::make_shared<sensor_msgs::Imu>();
+    *imu_ptr = *imu_msg;
+
+    if (g_camera_lidar_queue.m_if_acc_mul_G) // For LiVOX Avia built-in IMU
+    {
+        imu_ptr->linear_acceleration.x *= 9.805;
+        imu_ptr->linear_acceleration.y *= 9.805;
+        imu_ptr->linear_acceleration.z *= 9.805;
+    }
+
+    if (imu_ptr->header.stamp.toSec() <= last_imu_t_)
+    {
+        ROS_WARN("imu message in disorder!");
         return;
     }
-    double dt = t - latest_time;
-    latest_time = t;
+    g_camera_lidar_queue.imu_in(imu_ptr->header.stamp.toSec());
+
+    last_imu_t_ = imu_ptr->header.stamp.toSec();
+
+    buf_mutex_.lock();
+    imu_buf_.push(imu_ptr);
+    buf_mutex_.unlock();
+    con_.notify_one();
+
+    last_imu_t_ = imu_ptr->header.stamp.toSec();
+    {
+        std::lock_guard<std::mutex> lg(state_mutex_);
+        Predict(imu_ptr);
+        std_msgs::Header header = imu_ptr->header;
+        header.frame_id = "world";
+        if (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR)
+            pubLatestOdometry(tmp_P_, tmp_Q_, tmp_V_, header);
+    }
+}
+
+void R2live::FeatureCallback(const sensor_msgs::PointCloudConstPtr &feature_msg)
+{
+    if (!init_feature_)
+    {
+        //skip the first detected feature, which doesn't contain optical flow speed
+        init_feature_ = true;
+        return;
+    }
+
+    buf_mutex_.lock();
+    feature_buf_.push(feature_msg);
+    buf_mutex_.unlock();
+    con_.notify_one();
+}
+
+void R2live::RestartCallback(const std_msgs::BoolConstPtr &restart_msg)
+{
+    if (restart_msg->data == true)
+    {
+        ROS_WARN("restart the estimator!");
+
+        buf_mutex_.lock();
+        while (!feature_buf_.empty())
+            feature_buf_.pop();
+        while (!imu_buf_.empty())
+            imu_buf_.pop();
+        buf_mutex_.unlock();
+
+        estimator_mutex_.lock();
+        estimator_.clearState();
+        estimator_.setParameter();
+        estimator_mutex_.unlock();
+        current_time_ = -1;
+        last_imu_t_ = 0;
+    }
+}
+
+void R2live::RelocalizationCallback(const sensor_msgs::PointCloudConstPtr &points_msg)
+{
+    buf_mutex_.lock();
+    relo_buf_.push(points_msg);
+    buf_mutex_.unlock();
+}
+
+void R2live::Predict(const sensor_msgs::ImuConstPtr &imu_msg)
+{
+    double t = imu_msg->header.stamp.toSec();
+    if (init_imu_)
+    {
+        latest_time_ = t;
+        init_imu_ = false;
+        return;
+    }
+    double dt = t - latest_time_;
+    latest_time_ = t;
 
     double dx = imu_msg->linear_acceleration.x;
     double dy = imu_msg->linear_acceleration.y;
@@ -73,71 +150,72 @@ void predict(const sensor_msgs::ImuConstPtr &imu_msg)
     double rz = imu_msg->angular_velocity.z;
     Eigen::Vector3d angular_velocity{rx, ry, rz};
 
-    Eigen::Vector3d un_acc_0 = tmp_Q * (acc_0 - tmp_Ba) - estimator.m_gravity;
+    Eigen::Vector3d un_acc_0 = tmp_Q_ * (acc_0_ - tmp_Ba_) - estimator_.m_gravity;
 
-    Eigen::Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - tmp_Bg;
-    tmp_Q = tmp_Q * Utility::deltaQ(un_gyr * dt);
+    Eigen::Vector3d un_gyr = 0.5 * (gyr_0_ + angular_velocity) - tmp_Bg_;
+    tmp_Q_ = tmp_Q_ * Utility::deltaQ(un_gyr * dt);
 
-    Eigen::Vector3d un_acc_1 = tmp_Q * (linear_acceleration - tmp_Ba) - estimator.m_gravity;
+    Eigen::Vector3d un_acc_1 = tmp_Q_ * (linear_acceleration - tmp_Ba_) - estimator_.m_gravity;
 
     Eigen::Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
 
-    tmp_P = tmp_P + dt * tmp_V + 0.5 * dt * dt * un_acc;
-    tmp_V = tmp_V + dt * un_acc;
+    tmp_P_ = tmp_P_ + dt * tmp_V_ + 0.5 * dt * dt * un_acc;
+    tmp_V_ = tmp_V_ + dt * un_acc;
 
-    acc_0 = linear_acceleration;
-    gyr_0 = angular_velocity;
+    acc_0_ = linear_acceleration;
+    gyr_0_ = angular_velocity;    
 }
 
-void update()
+void R2live::Update()
 {
     TicToc t_predict;
-    latest_time = current_time;
-    tmp_P = estimator.Ps[WINDOW_SIZE];
-    tmp_Q = estimator.Rs[WINDOW_SIZE];
-    tmp_V = estimator.Vs[WINDOW_SIZE];
-    tmp_Ba = estimator.Bas[WINDOW_SIZE];
-    tmp_Bg = estimator.Bgs[WINDOW_SIZE];
-    acc_0 = estimator.acc_0;
-    gyr_0 = estimator.gyr_0;
+    latest_time_ = current_time_;
+    tmp_P_ = estimator_.Ps[WINDOW_SIZE];
+    tmp_Q_ = estimator_.Rs[WINDOW_SIZE];
+    tmp_V_ = estimator_.Vs[WINDOW_SIZE];
+    tmp_Ba_ = estimator_.Bas[WINDOW_SIZE];
+    tmp_Bg_ = estimator_.Bgs[WINDOW_SIZE];
+    acc_0_ = estimator_.acc_0;
+    gyr_0_ = estimator_.gyr_0;
 
-    queue<sensor_msgs::ImuConstPtr> tmp_imu_buf = imu_buf;
+    queue<sensor_msgs::ImuConstPtr> tmp_imu_buf = imu_buf_;
     for (sensor_msgs::ImuConstPtr tmp_imu_msg; !tmp_imu_buf.empty(); tmp_imu_buf.pop())
-        predict(tmp_imu_buf.front());
+        Predict(tmp_imu_buf.front());
 }
 
-std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> getMeasurements()
+std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> 
+R2live::GetMeasurements()
 {
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
-    std::unique_lock<std::mutex> lk(m_buf);
+    std::unique_lock<std::mutex> lk(buf_mutex_);
     while (true)
     {
-        if (imu_buf.empty() || feature_buf.empty())
+        if (imu_buf_.empty() || feature_buf_.empty())
             return measurements;
 
-        if (!(imu_buf.back()->header.stamp.toSec() > feature_buf.front()->header.stamp.toSec() + estimator.td))
+        if (!(imu_buf_.back()->header.stamp.toSec() > feature_buf_.front()->header.stamp.toSec() + estimator_.td))
         {
             //ROS_WARN("wait for imu, only should happen at the beginning");
-            sum_of_wait++;
+            sum_of_wait_++;
             return measurements;
         }
 
-        if (!(imu_buf.front()->header.stamp.toSec() < feature_buf.front()->header.stamp.toSec() + estimator.td))
+        if (!(imu_buf_.front()->header.stamp.toSec() < feature_buf_.front()->header.stamp.toSec() + estimator_.td))
         {
-            ROS_WARN("throw img, only should happen at the beginning [%.5f | %.5f] ", imu_buf.front()->header.stamp.toSec(), feature_buf.front()->header.stamp.toSec());
-            feature_buf.pop();
+            // ROS_WARN("throw img, only should happen at the beginning [%.5f | %.5f] ", imu_buf.front()->header.stamp.toSec(), feature_buf.front()->header.stamp.toSec());
+            feature_buf_.pop();
             continue;
         }
-        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();
-        feature_buf.pop();
+        sensor_msgs::PointCloudConstPtr img_msg = feature_buf_.front();
+        feature_buf_.pop();
 
         std::vector<sensor_msgs::ImuConstPtr> IMUs;
-        while (imu_buf.front()->header.stamp.toSec() < img_msg->header.stamp.toSec() + estimator.td)
+        while (imu_buf_.front()->header.stamp.toSec() < img_msg->header.stamp.toSec() + estimator_.td)
         {
-            IMUs.emplace_back(imu_buf.front());
-            imu_buf.pop();
+            IMUs.emplace_back(imu_buf_.front());
+            imu_buf_.pop();
         }
-        IMUs.emplace_back(imu_buf.front());
+        IMUs.emplace_back(imu_buf_.front());
         if (IMUs.empty())
             ROS_WARN("no imu between two image");
         measurements.emplace_back(IMUs, img_msg);
@@ -145,99 +223,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
     return measurements;
 }
 
-void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
-{
-    sensor_msgs::ImuPtr imu_msg = boost::make_shared<sensor_msgs::Imu>();
-    *imu_msg = *_imu_msg;
-
-    // if (g_if_divide_g == 0)
-    if (g_camera_lidar_queue.m_if_acc_mul_G) // For LiVOX Avia built-in IMU
-    {
-        imu_msg->linear_acceleration.x *= 9.805;
-        imu_msg->linear_acceleration.y *= 9.805;
-        imu_msg->linear_acceleration.z *= 9.805;
-    }
-
-    if (imu_msg->header.stamp.toSec() <= last_imu_t)
-    {
-        ROS_WARN("imu message in disorder!");
-        return;
-    }
-    g_camera_lidar_queue.imu_in(imu_msg->header.stamp.toSec());
-
-    last_imu_t = imu_msg->header.stamp.toSec();
-
-    m_buf.lock();
-    imu_buf.push(imu_msg);
-    m_buf.unlock();
-    con.notify_one();
-
-    last_imu_t = imu_msg->header.stamp.toSec();
-    // cout << "Imu_msg last time= " << last_imu_t << endl;
-    {
-        std::lock_guard<std::mutex> lg(m_state);
-        predict(imu_msg);
-        std_msgs::Header header = imu_msg->header;
-        header.frame_id = "world";
-        if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
-            pubLatestOdometry(tmp_P, tmp_Q, tmp_V, header);
-    }
-}
-
-void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
-{
-    if (!init_feature)
-    {
-        //skip the first detected feature, which doesn't contain optical flow speed
-        init_feature = 1;
-        return;
-    }
-
-    m_buf.lock();
-    feature_buf.push(feature_msg);
-    m_buf.unlock();
-    con.notify_one();
-}
-
-void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
-{
-    if (restart_msg->data == true)
-    {
-        ROS_WARN("restart the estimator!");
-        m_buf.lock();
-        while (!feature_buf.empty())
-            feature_buf.pop();
-        while (!imu_buf.empty())
-            imu_buf.pop();
-        m_buf.unlock();
-        m_estimator.lock();
-        estimator.clearState();
-        estimator.setParameter();
-        m_estimator.unlock();
-        current_time = -1;
-        last_imu_t = 0;
-    }
-    return;
-}
-
-void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
-{
-    //printf("relocalization callback! \n");
-    m_buf.lock();
-    relo_buf.push(points_msg);
-    m_buf.unlock();
-}
-
-// thread: visual-inertial odometry
-void unlock_lio(Estimator &estimator)
-{
-    if (estimator.m_fast_lio_instance)
-    {
-        estimator.m_fast_lio_instance->mutex_lio_process_.unlock();
-    }
-}
-
-void lock_lio(Estimator &estimator)
+void R2live::LockLio(Estimator &estimator)
 {
     if (estimator.m_fast_lio_instance)
     {
@@ -245,8 +231,15 @@ void lock_lio(Estimator &estimator)
     }
 }
 
-// ANCHOR - sync lio to cam
-void sync_lio_to_vio(Estimator &estimator)
+void R2live::UnLockLio(Estimator &estimator)
+{
+    if (estimator.m_fast_lio_instance)
+    {
+        estimator.m_fast_lio_instance->mutex_lio_process_.unlock();
+    }  
+}
+
+void R2live::SyncLio2Vio(Estimator &estimator)
 {
     check_state(g_lio_state);
     int frame_idx = estimator.frame_count;
@@ -257,22 +250,20 @@ void sync_lio_to_vio(Estimator &estimator)
         {
             estimator.Bas[frame_idx] = g_lio_state.bias_a;
             estimator.Bgs[frame_idx] = g_lio_state.bias_g;
-            estimator.Vs[frame_idx] = diff_vins_lio_q.toRotationMatrix().inverse() * g_lio_state.vel_end;
+            estimator.Vs[frame_idx] = diff_vins_lio_q_.toRotationMatrix().inverse() * g_lio_state.vel_end;
             estimator.m_gravity = g_lio_state.gravity;
             G_gravity = estimator.m_gravity;
-            update();
+            Update();
         }
     }
 }
 
-void visual_imu_measure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts_j,
+void R2live::VisualImuMeasure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts_j,
                         const Eigen::Vector3d &Pi, const Eigen::Quaterniond &Qi,
                         const Eigen::Vector3d &Pj, const Eigen::Quaterniond &Qj,
                         const Eigen::Vector3d &tic, const Eigen::Quaterniond &qic,
-                        const double inv_dep_i,
-                        Eigen::Vector2d & residual,
+                        const double inv_dep_i, Eigen::Vector2d & residual,
                         Eigen::Matrix<double, 2, 6, Eigen::RowMajor> & j_mat)
-
 {
     Eigen::Matrix2d sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     // Eigen::Matrix2d sqrt_info = Matrix2d::Identity();
@@ -306,10 +297,9 @@ void visual_imu_measure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts
     j_mat_temp = reduce * jaco_j;
     j_mat.block(0, 3, 2, 3) = j_mat_temp.block(0, 0, 2, 3);
     j_mat.block(0, 0, 2, 3) = j_mat_temp.block(0, 3, 2, 3);
-
 }
 
-void construct_camera_measure(int frame_idx, Estimator &estimator,
+void R2live::ConstructCameraMeasure(int frame_idx, Estimator &estimator,
                               std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> &reppro_err_vec,
                               std::vector<Eigen::Matrix<double, 2, 6, Eigen::RowMajor>, Eigen::aligned_allocator<Eigen::Matrix<double, 2, 6, Eigen::RowMajor>>> &J_mat_vec)
 {
@@ -371,36 +361,7 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
 
                 double inverse_depth = parameters_vec[3][0];
 
-                if(0)
-                {
-                    jacobian_mat_vec[0] = nullptr;
-                    jacobian_mat_vec[1] = j_mat_tq.data();
-                    jacobian_mat_vec[2] = nullptr;
-                    jacobian_mat_vec[3] = nullptr;
-                    ProjectionFactor *f = new ProjectionFactor(pts_i, pts_j);
-                    f->Evaluate(parameters_vec.data(), residual_vec_old.data(), (double **)jacobian_mat_vec);
-                    j_mat_old.block(0, 3, 2, 3) = j_mat_tq.block(0, 0, 2, 3);
-                    j_mat_old.block(0, 0, 2, 3) = j_mat_tq.block(0, 3, 2, 3);
-                }
-
-                if(1)
-                {
-                    visual_imu_measure(pts_i, pts_j, Pi, Qi, Pj, Qj, tic, qic, inverse_depth, residual_vec, j_mat);
-                }
-
-                if (0 && reppro_err_vec.size() == 0)
-                {
-                    cout << "============================" << endl;
-                    cout << "Old ESIKF first res_vec: " << residual_vec_old.transpose() << endl;
-                    cout << "ESIKF first res_vec: " << residual_vec.transpose() << endl;
-                    cout << "ESIKF first H_mat [2,7]:\r\n"
-                         << j_mat_tq << endl;
-                    cout << "Old ESIKF first H_mat [2,6]:\r\n"
-                         << j_mat_old << endl;
-                    cout << "ESIKF first H_mat [2,6]:\r\n"
-                         << j_mat << endl;
-                    
-                }
+                VisualImuMeasure(pts_i, pts_j, Pi, Qi, Pj, Qj, tic, qic, inverse_depth, residual_vec, j_mat);
 
                 if (std::isnan(residual_vec.sum()) || std::isnan(j_mat.sum()))
                 {
@@ -413,16 +374,9 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
         }
         f_m_cnt++;
     }
-
-    // cout << "Total measure size= " << reppro_err_vec.size() << endl;
-    // cout << "Min frame = " << min_frame << ", max_frame = " << max_frame
-    //      << ", Last track_num = " << estimator.f_manager.last_track_num
-    //      << endl;
 }
 
-int need_refresh_extrinsic = 0;
-
-void process()
+void R2live::Process()
 {
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
     G.setZero();
@@ -435,12 +389,12 @@ void process()
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
-        measurements = getMeasurements();
+        measurements = GetMeasurements();
         if(measurements.size() == 0)
         {
             continue;
         }
-        m_estimator.lock();
+        estimator_mutex_.lock();
 
         g_camera_lidar_queue.m_last_visual_time = -3e8;
         TicToc t_s;
@@ -448,58 +402,57 @@ void process()
         {
             auto img_msg = measurement.second;
             int if_camera_can_update = 1;
-            double cam_update_tim = img_msg->header.stamp.toSec() + estimator.td;
-            // ROS_INFO("Estimated td = %.5f" ,estimator.td );
-            // ANCHOR - determine if update of not.
-            if (estimator.m_fast_lio_instance != nullptr)
+            double cam_update_tim = img_msg->header.stamp.toSec() + estimator_.td;
+        
+            if (estimator_.m_fast_lio_instance != nullptr)
             {
-                g_camera_lidar_queue.m_camera_imu_td = estimator.td;
+                g_camera_lidar_queue.m_camera_imu_td = estimator_.td;
                 g_camera_lidar_queue.m_last_visual_time = img_msg->header.stamp.toSec();
                 while (g_camera_lidar_queue.if_camera_can_process() == false)
                 {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 }
 
-                lock_lio(estimator);
+                LockLio(estimator_);
                 t_s.tic();
                 double camera_LiDAR_tim_diff = img_msg->header.stamp.toSec() + g_camera_lidar_queue.m_camera_imu_td - g_lio_state.last_update_time;
                 // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
-                p_imu = estimator.m_fast_lio_instance->imu_process_;
+                p_imu = estimator_.m_fast_lio_instance->imu_process_;
             }
 
             if ((g_camera_lidar_queue.m_if_lidar_can_start == true) && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))
             {
-                m_state.lock();
-                sync_lio_to_vio(estimator);
-                m_state.unlock();
+                state_mutex_.lock();
+                SyncLio2Vio(estimator_);
+                state_mutex_.unlock();
             }
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
             int skip_imu = 0;
             for (auto &imu_msg : measurement.first)
             {
                 double t = imu_msg->header.stamp.toSec();
-                double img_t = img_msg->header.stamp.toSec() + estimator.td;
+                double img_t = img_msg->header.stamp.toSec() + estimator_.td;
 
                 if (t <= img_t)
                 {
-                    if (current_time < 0)
-                        current_time = t;
-                    double dt = t - current_time;
+                    if (current_time_ < 0)
+                        current_time_ = t;
+                    double dt = t - current_time_;
                     ROS_ASSERT(dt >= 0);
-                    current_time = t;
+                    current_time_ = t;
                     dx = imu_msg->linear_acceleration.x;
                     dy = imu_msg->linear_acceleration.y;
                     dz = imu_msg->linear_acceleration.z;
                     rx = imu_msg->angular_velocity.x;
                     ry = imu_msg->angular_velocity.y;
                     rz = imu_msg->angular_velocity.z;
-                    estimator.processIMU(dt, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
+                    estimator_.processIMU(dt, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                 }
                 else
                 {
-                    double dt_1 = img_t - current_time;
+                    double dt_1 = img_t - current_time_;
                     double dt_2 = t - img_t;
-                    current_time = img_t;
+                    current_time_ = img_t;
                     ROS_ASSERT(dt_1 >= 0);
                     ROS_ASSERT(dt_2 >= 0);
                     ROS_ASSERT(dt_1 + dt_2 > 0);
@@ -511,15 +464,15 @@ void process()
                     rx = w1 * rx + w2 * imu_msg->angular_velocity.x;
                     ry = w1 * ry + w2 * imu_msg->angular_velocity.y;
                     rz = w1 * rz + w2 * imu_msg->angular_velocity.z;
-                    estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
+                    estimator_.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                 }
             }
             // set relocalization frame
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
-            while (!relo_buf.empty())
+            while (!relo_buf_.empty())
             {
-                relo_msg = relo_buf.front();
-                relo_buf.pop();
+                relo_msg = relo_buf_.front();
+                relo_buf_.pop();
             }
 
             if (relo_msg != NULL)
@@ -539,7 +492,7 @@ void process()
                 Matrix3d relo_r = relo_q.toRotationMatrix();
                 int frame_index;
                 frame_index = relo_msg->channels[0].values[7];
-                estimator.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
+                estimator_.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
             }
 
             ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
@@ -568,21 +521,21 @@ void process()
                 double start_dt = g_lio_state.last_update_time - imu_queue.front()->header.stamp.toSec();
                 double end_dt = cam_update_tim - imu_queue.back()->header.stamp.toSec();
                 esikf_update_valid = true;
-                if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR))
+                if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR))
                 {
                     // *p_imu = *(estimator.m_fast_lio_instance->imu_process_);
-                    p_imu = estimator.m_fast_lio_instance->imu_process_;
+                    p_imu = estimator_.m_fast_lio_instance->imu_process_;
                     state_aft_integration = p_imu->ImuPreintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
-                    estimator.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
+                    estimator_.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
                     
-                    diff_vins_lio_q = eigen_q(estimator.Rs[WINDOW_SIZE].transpose() * state_aft_integration.rot_end);
-                    diff_vins_lio_t = state_aft_integration.pos_end - estimator.Ps[WINDOW_SIZE];
-                    if (diff_vins_lio_t.norm() > 1.0)
+                    diff_vins_lio_q_ = eigen_q(estimator_.Rs[WINDOW_SIZE].transpose() * state_aft_integration.rot_end);
+                    diff_vins_lio_t_ = state_aft_integration.pos_end - estimator_.Ps[WINDOW_SIZE];
+                    if (diff_vins_lio_t_.norm() > 1.0)
                     {
                         // ROS_INFO("VIO subsystem restart ");
-                        estimator.refine_vio_system(diff_vins_lio_q, diff_vins_lio_t);
-                        diff_vins_lio_q.setIdentity();
-                        diff_vins_lio_t.setZero();
+                        estimator_.refine_vio_system(diff_vins_lio_q_, diff_vins_lio_t_);
+                        diff_vins_lio_q_.setIdentity();
+                        diff_vins_lio_t_.setZero();
                     }
                     if ((start_dt > -0.02) &&
                         (fabs(end_dt) < 0.02))
@@ -594,8 +547,8 @@ void process()
                     {
                         // esikf_update_valid = false;
                         scope_color(ANSI_COLOR_RED_BOLD);
-                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator.m_fast_lio_instance->first_lidar_time_ << endl;
-                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator.m_fast_lio_instance->first_lidar_time_ << endl;
+                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator_.m_fast_lio_instance->first_lidar_time_ << endl;
+                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator_.m_fast_lio_instance->first_lidar_time_ << endl;
                         cout << "Start dt = " << start_dt << std::setprecision(2) << endl;
                         cout << "Final dt = " << end_dt << std::setprecision(2) << endl;
                         cout << "LiDAR->Image preintegration: " << start_dt << " <--> " << end_dt << endl;
@@ -622,7 +575,7 @@ void process()
                 image[feature_id].emplace_back(camera_id, xyz_uv_velocity);
             }
             // t_s.tic();
-            estimator.processImage(image, img_msg->header);
+            estimator_.processImage(image, img_msg->header);
             // estimator.vector2double();
             //Step 1: IMU preintergration
             StatesGroup state_prediction = state_aft_integration;
@@ -632,12 +585,12 @@ void process()
             int minmum_number_of_camera_res = 10;
             
             StatesGroup state_before_esikf = g_lio_state;
-            if (esikf_update_valid && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR) 
+            if (esikf_update_valid && (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR) 
                 && (g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim)
                 )
             {
-                estimator.vector2double();
-                estimator.f_manager.triangulate(estimator.Ps, estimator.tic, estimator.ric);
+                estimator_.vector2double();
+                estimator_.f_manager.triangulate(estimator_.Ps, estimator_.tic, estimator_.ric);
 
                 double deltaR = 0, deltaT = 0;
                 int flg_EKF_converged = 0;
@@ -655,17 +608,17 @@ void process()
                 Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> K_1;
                 for (int iter_time = 0; iter_time < 2; iter_time++)
                 {
-                    Eigen::Quaterniond q_pose_last = Eigen::Quaterniond(state_aft_integration.rot_end * diff_vins_lio_q.inverse());
-                    Eigen::Vector3d t_pose_last = state_aft_integration.pos_end - diff_vins_lio_t;
-                    estimator.m_para_Pose[win_idx][0] = t_pose_last(0);
-                    estimator.m_para_Pose[win_idx][1] = t_pose_last(1);
-                    estimator.m_para_Pose[win_idx][2] = t_pose_last(2);
-                    estimator.m_para_Pose[win_idx][3] = q_pose_last.x();
-                    estimator.m_para_Pose[win_idx][4] = q_pose_last.y();
-                    estimator.m_para_Pose[win_idx][5] = q_pose_last.z();
-                    estimator.m_para_Pose[win_idx][6] = q_pose_last.w();
+                    Eigen::Quaterniond q_pose_last = Eigen::Quaterniond(state_aft_integration.rot_end * diff_vins_lio_q_.inverse());
+                    Eigen::Vector3d t_pose_last = state_aft_integration.pos_end - diff_vins_lio_t_;
+                    estimator_.m_para_Pose[win_idx][0] = t_pose_last(0);
+                    estimator_.m_para_Pose[win_idx][1] = t_pose_last(1);
+                    estimator_.m_para_Pose[win_idx][2] = t_pose_last(2);
+                    estimator_.m_para_Pose[win_idx][3] = q_pose_last.x();
+                    estimator_.m_para_Pose[win_idx][4] = q_pose_last.y();
+                    estimator_.m_para_Pose[win_idx][5] = q_pose_last.z();
+                    estimator_.m_para_Pose[win_idx][6] = q_pose_last.w();
                     // estimator.f_manager.removeFailures();
-                    construct_camera_measure(win_idx, estimator, reppro_err_vec, J_mat_vec);
+                    ConstructCameraMeasure(win_idx, estimator_, reppro_err_vec, J_mat_vec);
 
                     if (reppro_err_vec.size() < minmum_number_of_camera_res)
                     {
@@ -733,11 +686,6 @@ void process()
                         {
                             g_lio_state = state_before_esikf;
                         }
-                        // Unblock lio process, publish esikf state.
-                        // TODO: publish esikf state.
-                        // unlock_lio(estimator);
-                        // g_camera_lidar_queue.m_last_visual_time  = g_lio_state.last_update_time + 0.02; // Unblock lio process, forward 80 ms
-                    
                     }
                 }
             }
@@ -745,11 +693,11 @@ void process()
             // Update state with pose graph optimization 
             g_lio_state = state_before_esikf;
             t_s.tic();
-            estimator.solve_image_pose(img_msg->header);
+            estimator_.solve_image_pose(img_msg->header);
 
             if (g_camera_lidar_queue.m_if_have_lidar_data)
             {
-                if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR && esikf_update_valid)
+                if (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR && esikf_update_valid)
                 {
                     if (g_camera_lidar_queue.m_visual_init_time == 3e88)
                     {
@@ -761,16 +709,16 @@ void process()
                     if ((g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim))
                     {
                         StatesGroup state_before_esikf = g_lio_state;
-                        if(estimator.Bas[WINDOW_SIZE].norm() < 0.5)
+                        if(estimator_.Bas[WINDOW_SIZE].norm() < 0.5)
                         {
-                            g_lio_state.bias_a = estimator.Bas[WINDOW_SIZE];
+                            g_lio_state.bias_a = estimator_.Bas[WINDOW_SIZE];
                         }
-                        g_lio_state.bias_g = estimator.Bgs[WINDOW_SIZE];
-                        g_lio_state.vel_end = diff_vins_lio_q.toRotationMatrix() * estimator.Vs[WINDOW_SIZE];
+                        g_lio_state.bias_g = estimator_.Bgs[WINDOW_SIZE];
+                        g_lio_state.vel_end = diff_vins_lio_q_.toRotationMatrix() * estimator_.Vs[WINDOW_SIZE];
                         g_lio_state.cov = state_aft_integration.cov;
 
-                        Eigen::Matrix3d temp_R = estimator.Rs[WINDOW_SIZE] * diff_vins_lio_q.toRotationMatrix();
-                        Eigen::Vector3d temp_T =  estimator.Ps[WINDOW_SIZE] + diff_vins_lio_t;
+                        Eigen::Matrix3d temp_R = estimator_.Rs[WINDOW_SIZE] * diff_vins_lio_q_.toRotationMatrix();
+                        Eigen::Vector3d temp_T =  estimator_.Ps[WINDOW_SIZE] + diff_vins_lio_t_;
                         eigen_q q_I = eigen_q(1.0, 0, 0, 0);
                         double angular_diff = eigen_q(temp_R.transpose() * state_before_esikf.rot_end).angularDistance(q_I) * 57.3;
                         double t_diff = (temp_T - state_before_esikf.pos_end).norm();
@@ -781,116 +729,61 @@ void process()
                             g_lio_state.rot_end = temp_R;
                             g_lio_state.pos_end = temp_T;
                         }
-                        unlock_lio(estimator);
+                        UnLockLio(estimator_);
                     }
                     
                 }
             }
-            if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
+            if (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR)
             {
-                m_state.lock();
-                if ((diff_vins_lio_t.norm() > 0.1) &&
-                    (diff_vins_lio_q.angularDistance(eigen_q::Identity()) * 57.3 > 0.1))
+                state_mutex_.lock();
+                if ((diff_vins_lio_t_.norm() > 0.1) &&
+                    (diff_vins_lio_q_.angularDistance(eigen_q::Identity()) * 57.3 > 0.1))
                 {
-                    estimator.refine_vio_system(diff_vins_lio_q, diff_vins_lio_t);
-                    diff_vins_lio_q.setIdentity();
-                    diff_vins_lio_t.setZero();
+                    estimator_.refine_vio_system(diff_vins_lio_q_, diff_vins_lio_t_);
+                    diff_vins_lio_q_.setIdentity();
+                    diff_vins_lio_t_.setZero();
                 }
-                m_state.unlock();
+                state_mutex_.unlock();
             }
-            unlock_lio(estimator);
-            m_state.lock();
+            UnLockLio(estimator_);
+            state_mutex_.lock();
             double whole_t = t_s.toc();
-            printStatistics(estimator, whole_t);
+            printStatistics(estimator_, whole_t);
             header = img_msg->header;
             header.frame_id = "world";
   
             if (g_camera_lidar_queue.m_if_have_lidar_data == false)
             {
-                pubOdometry(estimator, header);
+                pubOdometry(estimator_, header);
             }
             else
             {
-                pub_LiDAR_Odometry(estimator, state_aft_integration, header);
+                pub_LiDAR_Odometry(estimator_, state_aft_integration, header);
             }
-            pubCameraPose(estimator, header);
-            pubKeyPoses(estimator, header);
-            pubPointCloud(estimator, header);
-            pubTF(estimator, header);
-            pubKeyframe(estimator);
-            m_state.unlock();
+            pubCameraPose(estimator_, header);
+            pubKeyPoses(estimator_, header);
+            pubPointCloud(estimator_, header);
+            pubTF(estimator_, header);
+            pubKeyframe(estimator_);
+            state_mutex_.unlock();
             if (relo_msg != NULL)
             {
-                pubRelocalization(estimator);
+                pubRelocalization(estimator_);
             }
         }
 
-        m_estimator.unlock();
-        m_buf.lock();
-        m_state.lock();
-        if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
+        estimator_mutex_.unlock();
+        buf_mutex_.lock();
+        state_mutex_.lock();
+        if (estimator_.solver_flag == Estimator::SolverFlag::NON_LINEAR)
         {
-                update();
+            Update();
         }
-        m_state.unlock();
-        m_buf.unlock();
-    }
+        state_mutex_.unlock();
+        buf_mutex_.unlock();
+    }   
 }
 
 
-std::string getSystemTime()
-{
-    FILE *fp = NULL;
-    time_t timep;
-    char name[256] = {0};
-    time(&timep);//获取从1970至今过了多少秒，存入time_t类型的timep
-    strftime(name, sizeof(name), "%Y_%m_%d_%H_%M_%S",localtime(&timep)); 
-    return name;
-}
 
-int main(int argc, char **argv)
-{
-    ros::init(argc, argv, "vins_estimator");
-    ros::NodeHandle nh("~");
-    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
-   
-    ParameterServer* para_server = ParameterServer::GetInstance();
-    para_server->InitParamWithRos(nh);
-
-    readParameters(nh);
-    estimator.setParameter();
-
-    GetROSParameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
-    GetROSParameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
-    GetROSParameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
-    GetROSParameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
-    GetROSParameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
-    GetROSParameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
-    if(g_camera_lidar_queue.m_if_write_res_to_bag)
-    {
-        g_camera_lidar_queue.init_rosbag_for_recording();
-    }
-    // ANCHOR - Start lio process
-    g_camera_lidar_queue.m_if_lidar_can_start = false;
-    if (estimator.m_fast_lio_instance == nullptr)
-    {
-        estimator.m_fast_lio_instance = new FastLio(nh);
-    }
-#ifdef EIGEN_DONT_PARALLELIZE
-    ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
-#endif
-    ROS_WARN("waiting for image and imu...");
-
-    registerPub(nh);
-
-    ros::Subscriber sub_imu = nh.subscribe(IMU_TOPIC, 20000, imu_callback, ros::TransportHints().tcpNoDelay());
-    ros::Subscriber sub_image = nh.subscribe("/feature_tracker/feature", 20000, feature_callback, ros::TransportHints().tcpNoDelay());
-    ros::Subscriber sub_restart = nh.subscribe("/feature_tracker/restart", 20000, restart_callback, ros::TransportHints().tcpNoDelay());
-    ros::Subscriber sub_relo_points = nh.subscribe("/pose_graph/match_points", 20000, relocalization_callback, ros::TransportHints().tcpNoDelay());
-
-    sys_time = getSystemTime();
-    std::thread measurement_process(process);
-    ros::spin();
-
-    return 0;
-}

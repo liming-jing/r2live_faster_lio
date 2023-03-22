@@ -62,7 +62,7 @@ add_executable(lio_feat_extract
 target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
 add_executable(r2live
-    apps/r2live_node.cpp
+    apps/r2live_node.cc
     
     src/vins/parameters.cpp
     src/vins/estimator.cpp
@@ -89,6 +89,8 @@ add_executable(r2live
     src/fast_lio/pointcloud_ivox_map.cc
     src/fast_lio/pointcloud_ikd_map.cc 
     include/fast_lio/kd_tree/ikd_Tree.cpp
+    
+    src/r2live/r2live.cc
     )
 
 target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
