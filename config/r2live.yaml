@@ -5,3 +5,9 @@ r2live:
   lidar_drag_cam_tim: 10
   if_lidar_start_first: true
   test: "hello world ==> jlm"
+  # voxel map
+  voxel_size: 3.0
+  max_layer: 4                # 4 layer, 0, 1, 2, 3
+  layer_point_size: [5, 5, 5, 5, 5]
+  max_points_size: 1000
+  plannar_threshold: 0.01

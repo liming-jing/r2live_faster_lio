@@ -86,6 +86,14 @@ class ParameterServer {
         inline bool GetIfWriteRes2Bag() const {return if_write_res_2_bag_;}
         inline bool GetIfDumpLog() const {return if_dump_log_;}
 
+
+        /* voxel map parameters */
+        inline double GetMaxVoxelSize() const {return max_voxel_size_;}
+        inline int GetMaxLayer() const {return max_layer_;}
+        inline std::vector<double>& GetLayerPointSize() {return layer_point_size_;}
+        inline int GetMaxPointsSize() {return max_points_size_;}
+        inline double GetMinEigenValue() {return min_eigen_value_;}
+
     private:
         /* fast lio parameter */
         std::string imu_topic_;
@@ -128,6 +136,13 @@ class ParameterServer {
         bool if_write_res_2_bag_;
         bool if_dump_log_;
         // std::string bag_file_name_;
+
+        /* voxel map parameters */
+        double max_voxel_size_;
+        int max_layer_; 
+        std::vector<double> layer_point_size_;
+        int max_points_size_;
+        double min_eigen_value_;
 };
 
 #endif
