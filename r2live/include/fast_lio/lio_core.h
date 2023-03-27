@@ -13,8 +13,7 @@ extern StatesGroup g_lio_state;
 class LioCore{
     public:
         LioCore();
-
-        void SetEKFFlg(bool flg_EKF_inited);
+        
         void SetMap(std::shared_ptr<PointCloudMapBase> map_base_ptr);
         void Update(PointCloudXYZI::Ptr current_frame);
         inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;};

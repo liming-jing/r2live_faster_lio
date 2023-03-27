@@ -213,7 +213,7 @@ int FastLio::Process()
             continue;
         }
 
-        lio_core_ptr_->SetEKFFlg(flg_EKF_inited_);
+        ParameterServer::GetInstance()->SetFlagEKFInited(flg_EKF_inited_);
         lio_core_ptr_->Update(feats_down_);
 
         map_base_ptr_->AddNewPointCloud(feats_down_, lio_core_ptr_->GetNearestPoints(), flg_EKF_inited_);

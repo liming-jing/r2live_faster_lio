@@ -39,6 +39,8 @@ void LioCore::ReSetData(PointCloudXYZI::Ptr current_frame)
     coeff_sel_tmpt_.reset(new PointCloudXYZI(*current_frame));
     feats_down_updated_.reset(new PointCloudXYZI(*current_frame));
     res_last_.resize(points_size, 1000.0);
+
+    flg_EKF_inited_ = ParameterServer::GetInstance()->GetFlagEKFInited();
 }
 
 void LioCore::PointBodyToWorld(PointType const *const pi, PointType *const po)
@@ -218,11 +220,6 @@ void LioCore::CalculateJacobianMatrix(PointCloudXYZI::Ptr current_frame, Eigen::
         /*** Measuremnt: distance to the closest surface/corner ***/
         meas_vec(i) = -norm_p.intensity;
     }
-}
-
-void LioCore::SetEKFFlg(bool flg_EKF_inited)
-{
-    flg_EKF_inited_ = flg_EKF_inited;
 }
 
 void LioCore::IEKFUpdateState(Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec)
