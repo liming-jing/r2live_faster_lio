@@ -61,6 +61,7 @@ class ParameterServer {
         inline double GetPlanarCheckDis() const {return planar_check_dis_;}
         inline double GetLongRangPtDis() const {return long_rang_pt_dis_;}
         inline bool GetIfPublishFeatureMap() const {return if_publish_feature_map_;}
+        inline bool GetFlagEKFInited() const {return flg_EKF_inited_;}
 
         inline std::string GetMapMethod() const {return map_method_;}
 
@@ -90,9 +91,16 @@ class ParameterServer {
         /* voxel map parameters */
         inline double GetMaxVoxelSize() const {return max_voxel_size_;}
         inline int GetMaxLayer() const {return max_layer_;}
-        inline std::vector<double>& GetLayerPointSize() {return layer_point_size_;}
-        inline int GetMaxPointsSize() {return max_points_size_;}
-        inline double GetMinEigenValue() {return min_eigen_value_;}
+        inline std::vector<int>& GetLayerPointSize() {return layer_point_size_;}
+        inline int GetMaxPointsSize() const {return max_points_size_;}
+        inline double GetMinEigenValue() const {return min_eigen_value_;}
+        inline double GetRangingCov() const {return ranging_cov_;}
+        inline double GetAngleCov() const {return angle_cov_;}
+
+    public:
+        /*  set parameters */
+        inline void SetFlagEKFInited(bool flg) {flg_EKF_inited_ = flg;}
+
 
     private:
         /* fast lio parameter */
@@ -111,6 +119,7 @@ class ParameterServer {
         double planar_check_dis_;
         double long_rang_pt_dis_;
         bool if_publish_feature_map_;
+        bool flg_EKF_inited_;
 
         std::string map_method_;
 
@@ -140,9 +149,11 @@ class ParameterServer {
         /* voxel map parameters */
         double max_voxel_size_;
         int max_layer_; 
-        std::vector<double> layer_point_size_;
+        std::vector<int> layer_point_size_;
         int max_points_size_;
         double min_eigen_value_;
+        double ranging_cov_;
+        double angle_cov_;
 };
 
 #endif

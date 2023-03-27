@@ -47,10 +47,11 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     /* voxel map parameters */
     GetROSParameter(nh, "r2live/voxel_size", max_voxel_size_, 1.0);
     GetROSParameter(nh, "r2live/max_layer", max_layer_, 2);
-    // GetROSParameter<std::vector<double>>(nh, "r2live/layer_point_size", layer_point_size_, std::vector<double>());
-    nh.param<std::vector<double>>("r2live/layer_point_size",layer_point_size_, std::vector<double>());
+    nh.param<std::vector<int>>("r2live/layer_point_size", layer_point_size_, std::vector<int>());
     GetROSParameter(nh, "r2live/max_points_size", max_points_size_, 100);
     GetROSParameter(nh, "r2live/plannar_threshold", min_eigen_value_, 0.01);
 
+    GetROSParameter(nh, "r2live/ranging_cov", ranging_cov_, 0.02);
+    GetROSParameter(nh, "r2live/angle_cov", angle_cov_, 0.05);
 }
 

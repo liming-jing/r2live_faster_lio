@@ -11,3 +11,7 @@ r2live:
   layer_point_size: [5, 5, 5, 5, 5]
   max_points_size: 1000
   plannar_threshold: 0.01
+
+  # noise model
+  ranging_cov: 0.04
+  angle_cov: 0.1
