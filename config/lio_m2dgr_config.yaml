@@ -44,6 +44,5 @@ fast_lio:
    ivox_nearby_type: 18             # 6, 18, 26
    num_match_points: 5
 
-   map_method: "ivox"            # ivox or ikd_tree
    N_SCANS: 1800
    max_init_count: 10

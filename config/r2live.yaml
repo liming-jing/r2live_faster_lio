@@ -4,7 +4,6 @@ r2live:
   acc_mul_G: false
   lidar_drag_cam_tim: 10
   if_lidar_start_first: true
-  test: "hello world ==> jlm"
   # voxel map
   voxel_size: 3.0
   max_layer: 4                # 4 layer, 0, 1, 2, 3
@@ -15,3 +14,6 @@ r2live:
   # noise model
   ranging_cov: 0.04
   angle_cov: 0.1
+
+  # important
+  map_method: 1            # 0 : ikd_tree 1: ivox  2: voxel_map 

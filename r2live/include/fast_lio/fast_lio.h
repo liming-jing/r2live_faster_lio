@@ -21,11 +21,13 @@
 #include "pointcloud_map_base.h"
 #include "pointcloud_ikd_map.h"
 #include "pointcloud_ivox_map.h"
+#include "pointcloud_voxel_map.h"
 #include "lio_core.h"
 #include "r2live/parameter_server.h"
 #include "r2live/common_lib.h"
 #include "imu_process.h"
 #include "r2live/so3_math.h"
+#include "utility/tic_toc.h"
 
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
@@ -84,6 +86,8 @@ private:
     bool flg_EKF_inited_ = false;
     double cube_len_ = 0.0;
     double FOV_DEG = 0.0;
+
+    MapMethod map_method_;
 
     PointCloudXYZI::Ptr feats_undistort_;
     PointCloudXYZI::Ptr feats_down_;

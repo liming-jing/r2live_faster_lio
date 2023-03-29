@@ -88,7 +88,9 @@ add_executable(r2live
     src/fast_lio/imu_process.cc
     src/fast_lio/pointcloud_ivox_map.cc
     src/fast_lio/pointcloud_ikd_map.cc 
+    src/fast_lio/pointcloud_voxel_map.cc
     include/fast_lio/kd_tree/ikd_Tree.cpp
+    include/fast_lio/voxel_map/voxel_map.cc
     
     src/r2live/r2live.cc
     )

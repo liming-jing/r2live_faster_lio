@@ -57,6 +57,8 @@ static const Eigen::Vector3f Zero3f(0, 0, 0);
 // Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
 static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 
+enum MapMethod {kIkdTreeMap = 0, kIvoxMap = 1, kVoxelMap = 2};
+
 template <typename T>
 T GetROSParameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
 {

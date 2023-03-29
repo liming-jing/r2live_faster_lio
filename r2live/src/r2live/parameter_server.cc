@@ -21,7 +21,7 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
     GetROSParameter(nh, "fast_lio/long_rang_pt_dis", long_rang_pt_dis_, 50.0);
     GetROSParameter(nh, "fast_lio/publish_feature_map", if_publish_feature_map_, false);
 
-    GetROSParameter(nh, "fast_lio/map_method", map_method_, std::string("ivox"));
+    GetROSParameter(nh, "r2live/map_method", map_method_, 0);
 
     /* feature parameters */
     GetROSParameter(nh,"feature_extraction/N_SCANS", n_scans_, 1800);
@@ -53,5 +53,7 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
 
     GetROSParameter(nh, "r2live/ranging_cov", ranging_cov_, 0.02);
     GetROSParameter(nh, "r2live/angle_cov", angle_cov_, 0.05);
+
+    LOG(INFO) << "Parameters 加载完毕..." ;
 }
 

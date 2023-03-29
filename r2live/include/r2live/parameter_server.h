@@ -63,7 +63,7 @@ class ParameterServer {
         inline bool GetIfPublishFeatureMap() const {return if_publish_feature_map_;}
         inline bool GetFlagEKFInited() const {return flg_EKF_inited_;}
 
-        inline std::string GetMapMethod() const {return map_method_;}
+        inline int GetMapMethod() const {return map_method_;}
 
         /* feature extract get parameter */
         inline int GetNScans() const {return n_scans_;}
@@ -121,8 +121,8 @@ class ParameterServer {
         bool if_publish_feature_map_;
         bool flg_EKF_inited_;
 
-        std::string map_method_;
-
+        int map_method_;
+       
         /* feature extract parameter */
         int n_scans_;
 

@@ -3,6 +3,7 @@
 LioCore::LioCore()
 {
     Init();
+    LOG(INFO) << "LioCore 初始化完成...";
 }
 
 void LioCore::Init()
@@ -18,6 +19,13 @@ void LioCore::Init()
 
     laser_cloud_ori_.reset(new PointCloudXYZI());
     coeff_sel_.reset(new PointCloudXYZI());
+
+    ranging_cov_ = para_server->GetRangingCov();
+    angle_cov_ = para_server->GetAngleCov();
+    max_voxel_size_ = para_server->GetMaxVoxelSize();
+    max_layer_ = para_server->GetMaxLayer();
+    max_points_size_ = para_server->GetMaxPointsSize();
+    min_eigen_value_ = para_server->GetMinEigenValue();
 
     G.setZero();
     H_T_H.setZero();
@@ -131,8 +139,25 @@ void LioCore::PCASolver(PointVector& points_near, double ori_pt_dis,
 
 void LioCore::Update(PointCloudXYZI::Ptr current_frame)
 {
-    ReSetData(current_frame);
+    switch (ParameterServer::GetInstance()->GetMapMethod())
+    {
+    case kIkdTreeMap:
+    case kIvoxMap:
+        UpdateNoVoxelMap(current_frame);
+        break;
+    case kVoxelMap:
+        UpdateVoxelMap(current_frame);
+        break;
+    
+    default:
+        UpdateNoVoxelMap(current_frame);
+        break;
+    }
+}
 
+ void LioCore::UpdateNoVoxelMap(PointCloudXYZI::Ptr current_frame)
+ {
+    ReSetData(current_frame);
     int points_size = current_frame->points.size();
     double maximum_pt_range = 0.0;
     rematch_en_ = false;
@@ -185,19 +210,12 @@ void LioCore::Update(PointCloudXYZI::Ptr current_frame)
         CalculateJacobianMatrix(current_frame, Hsub, meas_vec);
         IEKFUpdateState(Hsub, meas_vec);
 
-        rematch_en_ = false;
-        if (flg_EKF_converged_ || ((rematch_num_ == 0) && (iter_count_ == (num_max_iterations_ - 2))))
-        {
-            rematch_en_ = true;
-            rematch_num_++;
-        }
-
         if (IEKFUpdateCovariance(Hsub))
         {
             break;
         }
     }
-}
+ }
 
 void LioCore::CalculateJacobianMatrix(PointCloudXYZI::Ptr current_frame, Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec)
 {
@@ -277,6 +295,14 @@ void LioCore::IEKFUpdateState(Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec)
 
 bool LioCore::IEKFUpdateCovariance(Eigen::MatrixXd& Hsub)
 {
+
+    rematch_en_ = false;
+    if (flg_EKF_converged_ || ((rematch_num_ == 0) && (iter_count_ == (num_max_iterations_ - 2))))
+    {
+        rematch_en_ = true;
+        rematch_num_++;
+    }
+
     if (rematch_num_ >= 2 || (iter_count_ == num_max_iterations_ - 1)) // Fast lio ori version.
     {
         if (flg_EKF_inited_)
@@ -288,4 +314,268 @@ bool LioCore::IEKFUpdateCovariance(Eigen::MatrixXd& Hsub)
         return true;
     }
     return false;
+}
+
+
+void LioCore::UpdateVoxelMap(PointCloudXYZI::Ptr current_frame)
+{
+    // 1. 计算每个点的协方差
+
+    std::vector<Eigen::Matrix3d> body_var;
+    std::vector<Eigen::Matrix3d> crossmat_list;
+
+    printf_func
+    CalcBodyCovAndCrossmat(current_frame, body_var, crossmat_list);
+    printf_func
+
+    map_base_ptr_->SetParameters(body_var);
+
+    printf_func
+
+    for (iter_count_ = 0; iter_count_ < num_max_iterations_; iter_count_++)
+    {
+        // 2. 3 sigma criterion
+        std::vector<pointWithCov> pv_list;
+        printf_func
+        OrganizeData(current_frame, body_var, crossmat_list, pv_list);
+
+        printf_func 
+        // 3. 构建残差
+        std::vector<ptpl> ptpl_list;
+        std::vector<Eigen::Vector3d> non_match_list;
+        map_base_ptr_->GetResidualList(pv_list, ptpl_list, non_match_list);
+        printf_func
+
+        // 4. 求解雅克比矩阵
+        Eigen::MatrixXd Hsub, Hsub_T_R_inv;
+        Eigen::VectorXd R_inv, meas_vec;
+        CalculateJacobianMatrix(ptpl_list, Hsub, Hsub_T_R_inv, R_inv, meas_vec);
+        printf_func
+        // 5. 系统状态更新
+        IEKFUpdateStateForVoxelMap(ptpl_list, Hsub, Hsub_T_R_inv, meas_vec);
+        printf_func
+        // 6. 收敛性判断
+        if (IEKFUpdateCovariance(Hsub))
+        {
+            break;
+        }
+        printf_func
+    }
+    printf_func
+}
+
+void LioCore::CalcBodyCovAndCrossmat(PointCloudXYZI::Ptr current_frame, 
+                                    std::vector<Eigen::Matrix3d>& body_var, 
+                                    std::vector<Eigen::Matrix3d>& crossmat_list)
+{
+
+    for (size_t i = 0; i < current_frame->size(); i++)
+    {
+        Eigen::Vector3d point_this(current_frame->points[i].x, current_frame->points[i].y, current_frame->points[i].z);
+        if (point_this[2] == 0) 
+        {
+            point_this[2] = 0.001;
+        }
+        Eigen::Matrix3d cov;
+        
+        CalcBodyCov(point_this, ranging_cov_, angle_cov_, cov);
+
+        Eigen::Matrix3d point_crossmat;
+        point_crossmat << SKEW_SYM_MATRX(point_this);
+        crossmat_list.push_back(point_crossmat);
+
+        body_var.push_back(cov);
+    }
+}
+
+void LioCore::OrganizeData(PointCloudXYZI::Ptr current_frame, 
+                          const std::vector<Eigen::Matrix3d>& body_var, 
+                          const std::vector<Eigen::Matrix3d>& crossmat_list,
+                          std::vector<pointWithCov>& pv_list)
+{
+    for (size_t i = 0, id = current_frame->points.size(); i != id; i++)
+    {
+        pcl::PointXYZINormal p_c = current_frame->points[i];
+        Eigen::Vector3d p(p_c.x, p_c.y, p_c.z);
+        p = g_lio_state.rot_end * p + g_lio_state.pos_end;
+
+        pcl::PointXYZI pi_world;
+        pi_world.x = p(0);
+        pi_world.y = p(1);
+        pi_world.z = p(2);
+        pi_world.intensity = p_c.intensity;
+
+        pointWithCov pv;
+        pv.point << current_frame->points[i].x, current_frame->points[i].y, current_frame->points[i].z;
+        pv.point_world << pi_world.x, pi_world.y, pi_world.z;
+
+        Eigen::Matrix3d point_crossmat = crossmat_list[i];
+        Eigen::Matrix3d rot_var = g_lio_state.cov.block<3, 3>(0, 0);
+        Eigen::Matrix3d t_var = g_lio_state.cov.block<3, 3>(3, 3);
+
+        Eigen::Matrix3d cov = body_var[i];
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose() +
+            (-point_crossmat) * rot_var * (-point_crossmat.transpose()) +
+            t_var;
+        pv.cov = cov;
+
+        pv_list.push_back(pv);
+    }
+}
+
+void LioCore::CalculateJacobianMatrix(const std::vector<ptpl>& ptpl_list,
+                                     Eigen::MatrixXd& Hsub,
+                                     Eigen::MatrixXd& Hsub_T_R_inv,
+                                     Eigen::VectorXd& R_inv,
+                                     Eigen::VectorXd& meas_vec)
+{
+    size_t effct_feat_num = ptpl_list.size();
+
+    Hsub.resize(effct_feat_num, 6);
+    Hsub_T_R_inv.resize(6, effct_feat_num);
+    R_inv.resize(effct_feat_num);
+    meas_vec.resize(effct_feat_num);
+
+    laser_cloud_ori_->clear();
+
+    for (size_t i = 0; i != effct_feat_num; i++)
+    {
+        PointType pi_body;
+        pi_body.x = ptpl_list[i].point(0);
+        pi_body.y = ptpl_list[i].point(1);
+        pi_body.z = ptpl_list[i].point(2);
+
+        laser_cloud_ori_->push_back(pi_body);
+
+        PointType pi_world;
+        PointTypeBodyToWorld(&pi_body, &pi_world);
+        
+        Eigen::Vector3d point_this(pi_body.x, pi_body.y, pi_body.z);
+        Eigen::Matrix3d cov;
+        CalcBodyCov(point_this, ranging_cov_, angle_cov_, cov);
+
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose();
+
+        Eigen::Matrix3d point_crossmat;
+        point_crossmat << SKEW_SYM_MATRX(point_this);
+
+        PointType norm_p;
+        norm_p.x = ptpl_list[i].normal(0);
+        norm_p.y = ptpl_list[i].normal(1);
+        norm_p.z = ptpl_list[i].normal(2);
+        norm_p.intensity = pi_world.x * norm_p.x + pi_world.y * norm_p.y + pi_world.z * norm_p.z + ptpl_list[i].d;
+
+
+        Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
+        Eigen::Vector3d point_world = g_lio_state.rot_end * point_this + g_lio_state.pos_end;
+
+        // /*** get the normal vector of closest surface/corner ***/
+        Eigen::Matrix<double, 1, 6> J_nq;
+        J_nq.block<1, 3>(0, 0) = point_world - ptpl_list[i].center;
+        J_nq.block<1, 3>(0, 3) = -ptpl_list[i].normal;
+        double sigma_l = J_nq * ptpl_list[i].plane_cov * J_nq.transpose();
+        R_inv(i) = 1.0 / (sigma_l + norm_vec.transpose() * cov * norm_vec);
+        double ranging_dis = point_this.norm();
+        laser_cloud_ori_->points[i].intensity = sqrt(R_inv(i));
+        laser_cloud_ori_->points[i].normal_x = norm_p.intensity;
+        laser_cloud_ori_->points[i].normal_y = sqrt(sigma_l);
+        laser_cloud_ori_->points[i].normal_z = sqrt(norm_vec.transpose() * cov * norm_vec);
+        laser_cloud_ori_->points[i].curvature = sqrt(sigma_l + norm_vec.transpose() * cov * norm_vec);
+
+        /*** calculate the Measuremnt Jacobian matrix H ***/
+        Eigen::Vector3d A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
+        Hsub.row(i) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
+        Hsub_T_R_inv.col(i) << A[0] * R_inv(i), A[1] * R_inv(i),
+            A[2] * R_inv(i), norm_p.x * R_inv(i), norm_p.y * R_inv(i),
+            norm_p.z * R_inv(i);
+        /*** Measuremnt: distance to the closest surface/corner ***/
+        meas_vec(i) = -norm_p.intensity;
+    }
+}
+
+void LioCore::IEKFUpdateStateForVoxelMap(const std::vector<ptpl>& ptpl_list,
+                                         const Eigen::MatrixXd& Hsub,
+                                         const Eigen::MatrixXd& Hsub_T_R_inv,
+                                         const Eigen::VectorXd& meas_vec)
+{
+    K.resize(DIM_OF_STATES, ptpl_list.size());
+    Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
+    StatesGroup state_propagat(g_lio_state);
+    flg_EKF_inited_ = ParameterServer::GetInstance()->GetFlagEKFInited();
+
+    if (!flg_EKF_inited_) 
+    {
+
+        /*** only run in initialization period ***/
+        Eigen::MatrixXd H_init(Eigen::Matrix<double, 9, DIM_OF_STATES>::Zero());
+        Eigen::MatrixXd z_init(Eigen::Matrix<double, 9, 1>::Zero());
+        H_init.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity();
+        H_init.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity();
+        H_init.block<3, 3>(6, 15) = Eigen::Matrix3d::Identity();
+        z_init.block<3, 1>(0, 0) = -Log(g_lio_state.rot_end);
+        z_init.block<3, 1>(0, 0) = -g_lio_state.pos_end;
+
+        auto H_init_T = H_init.transpose();
+        auto &&K_init = g_lio_state.cov * H_init_T * (H_init * g_lio_state.cov * H_init_T + 0.0001 * Eigen::Matrix<double, 9, 9>::Identity()).inverse();
+        solution = K_init * z_init;
+
+        solution.block<9, 1>(0, 0).setZero();
+        g_lio_state += solution;
+        g_lio_state.cov = (Eigen::MatrixXd::Identity(DIM_OF_STATES, DIM_OF_STATES) - K_init * H_init) * g_lio_state.cov;
+        
+    } 
+    else 
+    {
+        auto &&Hsub_T = Hsub.transpose();
+        H_T_H.block<6, 6>(0, 0) = Hsub_T_R_inv * Hsub;
+        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
+            (H_T_H + (g_lio_state.cov / 0.00015).inverse()).inverse(); 
+        K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
+
+        auto vec = state_propagat - g_lio_state;
+        solution = K * meas_vec + vec - K * Hsub * vec.block<6, 1>(0, 0);
+
+        g_lio_state += solution;
+
+        Eigen::Vector3d rot_add = solution.block<3, 1>(0, 0);
+        Eigen::Vector3d t_add = solution.block<3, 1>(3, 0);
+
+        if ((rot_add.norm() * 57.3 < 0.01) && (t_add.norm() * 100 < 0.015)) 
+        {
+            flg_EKF_converged_ = true;
+        }
+    }
+}
+
+
+void LioCore::TransformPointBody2World(const PointCloudXYZI::Ptr &point_cloud_body, 
+                                      pcl::PointCloud<pcl::PointXYZI>::Ptr &point_cloud_world)
+{
+    point_cloud_world->clear();
+
+    for (size_t i = 0; i < point_cloud_body->size(); i++) {
+
+        pcl::PointXYZINormal p_c = point_cloud_body->points[i];
+        Eigen::Vector3d p(p_c.x, p_c.y, p_c.z);
+        p = g_lio_state.rot_end * p + g_lio_state.pos_end;
+
+        pcl::PointXYZI pi;
+        pi.x = p(0);
+        pi.y = p(1);
+        pi.z = p(2);
+        pi.intensity = p_c.intensity;
+
+        point_cloud_world->points.push_back(pi);
+    }
+}
+
+void LioCore::PointTypeBodyToWorld(PointType const *const pi, PointType *const po)
+{
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
+
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
+    po->intensity = pi->intensity;
 }

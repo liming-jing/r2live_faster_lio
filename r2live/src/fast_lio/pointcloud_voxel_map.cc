@@ -18,6 +18,13 @@ void PointCloudVoxelMap::Init()
     angle_cov_ = para_server->GetAngleCov();
 }
 
+void PointCloudVoxelMap::SetParameters(std::vector<Eigen::Matrix3d>& body_var)
+{
+    body_var_.resize(0);
+    body_var_.shrink_to_fit();
+    body_var_ = body_var;
+}
+
 void PointCloudVoxelMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
 {
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(new pcl::PointCloud<pcl::PointXYZI>);
@@ -31,7 +38,7 @@ void PointCloudVoxelMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
             world_lidar->points[i].z;
         Eigen::Vector3d point_this(cloud->points[i].x, cloud->points[i].y, cloud->points[i].z);
 
-        // if z=0, error will occur in calcBodyCov. To be solved
+        // if z=0, error will occur in CalcBodyCov. To be solved
         if (point_this[2] == 0) 
         {
             point_this[2] = 0.001;
@@ -54,6 +61,56 @@ void PointCloudVoxelMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
     }
 
     BuildVoxelMap(pv_list);
+}
+
+void PointCloudVoxelMap::GetResidualList(const std::vector<pointWithCov>& pv_list, std::vector<ptpl> &ptpl_list, std::vector<Eigen::Vector3d> &non_match)
+{
+    BuildResidualListOMP(voxel_map_, max_voxel_size_, 3.0, max_layer_, pv_list, ptpl_list, non_match);
+}
+
+void PointCloudVoxelMap::AddNewPointCloud(PointCloudXYZI::Ptr cloud, std::vector<PointVector>& nearest_points, bool flg)
+{
+    std::vector<pointWithCov> pv_list;
+
+    printf_line
+
+    for (size_t i = 0, id = cloud->points.size(); i != id; i++)
+    {
+        pcl::PointXYZINormal p_c = cloud->points[i];
+        Eigen::Vector3d p(p_c.x, p_c.y, p_c.z);
+        p = g_lio_state.rot_end * p + g_lio_state.pos_end;
+        
+        pcl::PointXYZI p_world;
+        p_world.x = p(0);
+        p_world.y = p(1);
+        p_world.z = p(2);
+        p_world.intensity = p_c.intensity;
+
+        pointWithCov pv;
+        pv.point << p_world.x, p_world.y, p_world.z;
+
+        Eigen::Matrix3d point_crossmat ;
+        point_crossmat << SKEW_SYM_MATRX(p);
+
+        Eigen::Matrix3d cov = body_var_[i];
+        
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose() +
+              (-point_crossmat) * g_lio_state.cov.block<3, 3>(0, 0) *
+                  (-point_crossmat).transpose() +
+              g_lio_state.cov.block<3, 3>(3, 3);
+        pv.cov = cov;
+        pv_list.push_back(pv);
+    }
+
+    printf_line
+
+    std::sort(pv_list.begin(), pv_list.end(), var_contrast);
+
+    printf_line
+
+    updateVoxelMap(pv_list, max_voxel_size_, max_layer_, layer_size_,
+                     max_points_size_, max_points_size_, min_eigen_value_,
+                     voxel_map_);
 }
 
 void PointCloudVoxelMap::TransformPointBody2World(const PointCloudXYZI::Ptr &point_cloud_body, pcl::PointCloud<pcl::PointXYZI>::Ptr &point_cloud_world)

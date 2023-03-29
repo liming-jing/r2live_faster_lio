@@ -7,6 +7,7 @@
 #include "r2live/parameter_server.h"
 #include "pointcloud_map_base.h"
 #include "r2live/common_lib.h"
+#include "fast_lio/voxel_map/voxel_map.h"
 
 extern StatesGroup g_lio_state;
 
@@ -16,10 +17,16 @@ class LioCore{
         
         void SetMap(std::shared_ptr<PointCloudMapBase> map_base_ptr);
         void Update(PointCloudXYZI::Ptr current_frame);
-        inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;};
+        inline PointCloudXYZI::Ptr GetLaserCloudOri() {return laser_cloud_ori_;}
         std::vector<PointVector>& GetNearestPoints() {return nearest_points_;}
     private:
         void Init();
+
+        void UpdateNoVoxelMap(PointCloudXYZI::Ptr current_frame);
+        void UpdateVoxelMap(PointCloudXYZI::Ptr current_frame);
+
+    private:
+        /* updateNoVoxelMap */
         void ReSetData(PointCloudXYZI::Ptr current_frame);
         void PointBodyToWorld(PointType const *const pi, PointType *const po);
         void PCASolver(PointVector& points_near, double ori_pt_dis,
@@ -28,6 +35,31 @@ class LioCore{
         void CalculateJacobianMatrix(PointCloudXYZI::Ptr current_frame, Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec);
         void IEKFUpdateState(Eigen::MatrixXd& Hsub, Eigen::VectorXd& meas_vec);
         bool IEKFUpdateCovariance(Eigen::MatrixXd& Hsub);
+
+    private:
+        /* update voxel map*/
+        void CalcBodyCovAndCrossmat(PointCloudXYZI::Ptr current_frame, 
+                                    std::vector<Eigen::Matrix3d>& body_var, 
+                                    std::vector<Eigen::Matrix3d>& crossmat_list);
+        void OrganizeData(PointCloudXYZI::Ptr current_frame, 
+                          const std::vector<Eigen::Matrix3d>& body_var, 
+                          const std::vector<Eigen::Matrix3d>& crossmat_list,
+                          std::vector<pointWithCov>& pv_list);
+        void CalculateJacobianMatrix(const std::vector<ptpl>& ptpl_list,
+                                     Eigen::MatrixXd& Hsub,
+                                     Eigen::MatrixXd& Hsub_T_R_inv,
+                                     Eigen::VectorXd& R_inv,
+                                     Eigen::VectorXd& meas_vec);
+
+        void IEKFUpdateStateForVoxelMap(const std::vector<ptpl>& ptpl_list,
+                                        const Eigen::MatrixXd& Hsub,
+                                        const Eigen::MatrixXd& Hsub_T_R_inv,
+                                        const Eigen::VectorXd& meas_vec);
+        
+        void TransformPointBody2World(const PointCloudXYZI::Ptr &point_cloud_body, 
+                                      pcl::PointCloud<pcl::PointXYZI>::Ptr &point_cloud_world);
+
+        void PointTypeBodyToWorld(PointType const *const pi, PointType *const po);
     private:
         double maximum_pt_kdtree_dis_ = 1.0;
         double planar_check_dis_ = 0.05;
@@ -54,6 +86,14 @@ class LioCore{
         PointCloudXYZI::Ptr coeff_sel_tmpt_;
         PointCloudXYZI::Ptr feats_down_updated_;
         std::vector<double> res_last_; 
+
+        // new parameter for UpdateVoxelMap()
+        double ranging_cov_;
+        double angle_cov_;
+        double max_voxel_size_;
+        int max_layer_; 
+        int max_points_size_;
+        double min_eigen_value_;
 
     private:
         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;

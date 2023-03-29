@@ -13,6 +13,7 @@ FastLio::FastLio(ros::NodeHandle& nh)
     sub_imu_ = nh.subscribe(imu_topic_, 2000000, &FastLio::ImuCbk, this, ros::TransportHints().tcpNoDelay());
     sub_pcl_ = nh.subscribe("/laser_cloud_flat", 2000000, &FastLio::FeatPointsCbk, this, ros::TransportHints().tcpNoDelay());
 
+    LOG(INFO) << "FastLio 初始化完毕...";
 }
 
 void FastLio::Init(ros::NodeHandle& nh)
@@ -37,14 +38,25 @@ void FastLio::Init(ros::NodeHandle& nh)
     downsize_filter_map_.setLeafSize(filter_size_map_min_, filter_size_map_min_, filter_size_map_min_);
     downsize_filter_surf_.setLeafSize(filter_size_surf_min_, filter_size_surf_min_, filter_size_surf_min_);
 
-    if (para_server->GetMapMethod() == "ivox")
+
+    switch (para_server->GetMapMethod())
     {
-        LOG(INFO) << "Map is ivox";
-        map_base_ptr_ = std::make_shared<PointCloudIvoxMap>();
-    }
-    else {
-        LOG(INFO) << "Map is ikd_tree";
+    case kIkdTreeMap:
+        LOG(INFO) << "Map is IkdTree map";
         map_base_ptr_ = std::make_shared<PointCloudIkdMap>();
+        break;
+    case kIvoxMap:
+        LOG(INFO) << "Map is Ivox map";
+        map_base_ptr_ = std::make_shared<PointCloudIvoxMap>();
+        break;
+    case kVoxelMap:
+        LOG(INFO) << "Map is Voxel map";
+        map_base_ptr_ = std::make_shared<PointCloudVoxelMap>();
+        break;
+    default:
+        LOG(WARNING) << "default map is ikd Tree map";
+        map_base_ptr_ = std::make_shared<PointCloudIkdMap>();
+        break;
     }
 
     lio_core_ptr_ = std::make_shared<LioCore>();
@@ -164,6 +176,9 @@ int FastLio::Process()
         });
         lck.unlock();
       
+
+        printf_line
+
         if(g_camera_lidar_queue.m_if_lidar_can_start== 0) continue;
 
         if (flg_reset_)
@@ -173,11 +188,14 @@ int FastLio::Process()
             continue;
         }
        
+        TicToc time_process;
         imu_process_->Process(Measures, g_lio_state, feats_undistort_);
-       
+        LOG(WARNING) << "imu process using time: " << time_process.toc(); 
+
+
         g_camera_lidar_queue.g_noise_cov_acc = imu_process_->cov_acc_;
         g_camera_lidar_queue.g_noise_cov_gyro = imu_process_->cov_gyr_;
-        StatesGroup state_propagat(g_lio_state);
+        // StatesGroup state_propagat(g_lio_state);
 
         if (feats_undistort_->empty() || (feats_undistort_ == NULL))
         {
@@ -195,8 +213,10 @@ int FastLio::Process()
             flg_EKF_inited_ = true;
         }
 
+        TicToc time_laserfov;
         map_base_ptr_->LaserMapFovSegment(g_lio_state.pos_end);
-        
+        LOG(WARNING) << "map laser fov seg: " << time_laserfov.toc();
+
         downsize_filter_surf_.setInputCloud(feats_undistort_);
         downsize_filter_surf_.filter(*feats_down_);
 
@@ -214,11 +234,19 @@ int FastLio::Process()
         }
 
         ParameterServer::GetInstance()->SetFlagEKFInited(flg_EKF_inited_);
-        lio_core_ptr_->Update(feats_down_);
 
+        TicToc time_update;
+        lio_core_ptr_->Update(feats_down_);
+        LOG(WARNING) << "time update: " << time_update.toc();
+
+        printf_line
+        TicToc time_addpoints;
         map_base_ptr_->AddNewPointCloud(feats_down_, lio_core_ptr_->GetNearestPoints(), flg_EKF_inited_);
+        LOG(WARNING) << "time addpoints: " << time_addpoints.toc();
+        printf_line
         PublishData(feats_undistort_, feats_down_);
 
+        exit(1);
         rate.sleep();
     }
     return 0;

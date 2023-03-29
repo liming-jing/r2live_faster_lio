@@ -29,7 +29,7 @@ void PointCloudIvoxMap::Init()
     }
 }
 
- void PointCloudIvoxMap::LaserMapFovSegment(Eigen::Vector3d pos) {}
+void PointCloudIvoxMap::LaserMapFovSegment(Eigen::Vector3d pos) {}
 
 void PointCloudIvoxMap::InitPointCloudMap(PointCloudXYZI::Ptr cloud)
 {
