@@ -9,6 +9,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
+#include "tools/tools_logger.hpp"
 #include "common_lib.h"
 #include "estimator.h"
 #include "parameters.h"
@@ -148,6 +149,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
 
 void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
 {
+
     sensor_msgs::ImuPtr imu_msg = boost::make_shared<sensor_msgs::Imu>();
     *imu_msg = *_imu_msg;
 
@@ -164,6 +166,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
         ROS_WARN("imu message in disorder!");
         return;
     }
+
     g_camera_lidar_queue.imu_in(imu_msg->header.stamp.toSec());
 
     last_imu_t = imu_msg->header.stamp.toSec();
@@ -187,6 +190,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
 
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
+
     if (!init_feature)
     {
         // skip the first detected feature, which doesn't contain optical flow speed
@@ -431,10 +435,12 @@ void process()
 
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
+
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         measurements = getMeasurements();
+
         if (measurements.size() == 0)
         {
             continue;
@@ -472,6 +478,7 @@ void process()
                 sync_lio_to_vio(estimator);
                 m_state.unlock();
             }
+
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
             int skip_imu = 0;
             for (auto &imu_msg : measurement.first)
@@ -513,6 +520,7 @@ void process()
                     estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                 }
             }
+
             // set relocalization frame
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
             while (!relo_buf.empty())
@@ -620,6 +628,7 @@ void process()
                 xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
                 image[feature_id].emplace_back(camera_id, xyz_uv_velocity);
             }
+
             // t_s.tic();
             estimator.processImage(image, img_msg->header);
             // estimator.vector2double();
@@ -730,10 +739,6 @@ void process()
                         {
                             g_lio_state = state_before_esikf;
                         }
-                        // Unblock lio process, publish esikf state.
-                        // TODO: publish esikf state.
-                        // unlock_lio(estimator);
-                        // g_camera_lidar_queue.m_last_visual_time  = g_lio_state.last_update_time + 0.02; // Unblock lio process, forward 80 ms
                     }
                 }
             }
@@ -793,6 +798,7 @@ void process()
                 }
                 m_state.unlock();
             }
+
             unlock_lio(estimator);
             m_state.lock();
             double whole_t = t_s.toc();
@@ -882,7 +888,7 @@ int main(int argc, char **argv)
     ros::Subscriber sub_restart = nh.subscribe("/feature_tracker/restart", 20000, restart_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_relo_points = nh.subscribe("/pose_graph/match_points", 20000, relocalization_callback, ros::TransportHints().tcpNoDelay());
 
-    sys_time = getSystemTime();
+    // sys_time = getSystemTime();
     std::thread measurement_process(process);
     ros::spin();
 
