@@ -3,15 +3,16 @@
     <arg name="config_path" default = "$(find r2live)/../config/filr_m2dgr_cam.yaml" />
 	  <arg name="vins_path" default = "$(find r2live)/../config/../" />
     <rosparam command="load" file="$(find r2live)/../config/lio_m2dgr_config.yaml" />
+     <rosparam command="load" file="$(find r2live)/../config/velodyne.yaml" />
 
     
-    <!-- <node pkg="image_transport" type="republish" name="republish" args="compressed in:=/camera/color/image_raw raw out:=/camera/color/image_raw" output="screen" respawn="true"/>
+    <node pkg="image_transport" type="republish" name="republish" args="compressed in:=/camera/color/image_raw raw out:=/camera/color/image_raw" output="screen" respawn="true"/>
 
     <node name="feature_tracker" pkg="feature_tracker" type="feature_tracker" output="log">
         <param name="config_file" type="string" value="$(arg config_path)" />
         <param name="vins_folder" type="string" value="$(arg vins_path)" />
         <param name="image_topic" type="string" value="/camera/color/image_raw"/>
-    </node> -->
+    </node>
     
     <param name="imu_topic" type="string" value="/handsfree/imu"/>
     <param name="if_write_to_bag" type="int" value="0" />
@@ -25,25 +26,26 @@
     <!-- <node pkg="r2live" type="lio_feat_extract" name="lio_feat_extract"  output="screen"/> -->
 
 
-    <group if="1">
+    <!-- <group if="1">
         <node name="fast_lio_voxel_map" pkg="r2live" type="fast_lio_voxel_map" output="screen">
                 <param name="config_file" type="string" value="$(arg config_path)" />
                 <param name="vins_folder" type="string" value="$(arg vins_path)" />
                 <param name="imu_topic" type="string" value="/handsfree/imu"/>  
                 <rosparam command="load" file="$(find r2live)/../config/lio_m2dgr_config.yaml" />
         </node> 
-    </group>
+    </group> -->
 
 
     <!-- 注意imu的topic -->
-    <!-- <group if="1">
+    <group if="1">
         <node name="r2live" pkg="r2live" type="r2live" output="screen">
                 <param name="config_file" type="string" value="$(arg config_path)" />
                 <param name="vins_folder" type="string" value="$(arg vins_path)" />
                 <param name="imu_topic" type="string" value="/handsfree/imu"/>  
                 <rosparam command="load" file="$(find r2live)/../config/lio_m2dgr_config.yaml" />
+                <rosparam command="load" file="$(find r2live)/../config/velodyne.yaml" />
         </node> 
-    </group> -->
+    </group>
         
     <arg name="rviz" default="1" />
     <group if="$(arg rviz)">

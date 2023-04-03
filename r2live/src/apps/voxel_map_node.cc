@@ -6,7 +6,7 @@
 
 #include "voxel_mapping.h"
 
-// Camera_Lidar_queue g_camera_lidar_queue;
+Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
 StatesGroup g_lio_state;
 

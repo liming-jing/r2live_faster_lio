@@ -167,7 +167,7 @@ void ImuProcess::NewUndistortPcl(const MeasureGroup &meas, StatesGroup &state_in
 
     CalImuStateFrameEnd(meas, state_inout, angvel_avr, acc_avr, R_imu, acc_imu, pos_imu, vel_imu);
 
-    last_lidar_end_time = (pcl_out.points.back().curvature != 0) ? (pcl_beg_time + pcl_out.points.back().curvature / double(1000)) : meas.lidar_sec_time;
+    state_inout.last_update_time = (pcl_out.points.back().curvature != 0) ? (pcl_beg_time + pcl_out.points.back().curvature / double(1000)) : meas.lidar_sec_time;
 
     UndistortLidarPoint(state_inout, pcl_out);
 }
@@ -224,7 +224,24 @@ void ImuProcess::LicStatePropagate(const MeasureGroup &meas, StatesGroup &state_
     auto v_imu = meas.imu;
     v_imu.push_front(last_imu_);
 
-    /*** forward propagation at each imu point ***/
+    const double &imu_beg_time = v_imu.front()->header.stamp.toSec();
+    const double &imu_end_time = v_imu.back()->header.stamp.toSec();
+    const double &pcl_beg_time = meas.lidar_beg_time;
+
+    /*** sort point clouds by offset time ***/
+    PointCloudXYZI pcl_out = *(meas.lidar);
+    std::sort(pcl_out.points.begin(), pcl_out.points.end(), time_list);
+    const double &pcl_end_time = pcl_beg_time + pcl_out.points.back().curvature / double(1000);
+    double end_pose_dt = pcl_end_time - imu_end_time;
+
+    state_inout = ImuPreintegration(state_inout, v_imu, 1, end_pose_dt);
+}
+
+StatesGroup ImuProcess::ImuPreintegration(const StatesGroup &state_in,
+                                          std::deque<sensor_msgs::Imu::ConstPtr> &v_imu,
+                                          int if_multiply_g, double end_pose_dt)
+{
+    StatesGroup state_inout = state_in;
     V3D acc_imu, angvel_avr, acc_avr, vel_imu(state_inout.vel_end),
         pos_imu(state_inout.pos_end);
     M3D R_imu(state_inout.rot_end);
@@ -246,7 +263,12 @@ void ImuProcess::LicStatePropagate(const MeasureGroup &meas, StatesGroup &state_
         ImuStateUpdate(state_inout, angvel_avr, acc_avr, dt, R_imu, acc_imu, pos_imu, vel_imu);
     }
 
-    CalImuStateFrameEnd(meas, state_inout, angvel_avr, acc_avr, R_imu, acc_imu, pos_imu, vel_imu);
+    state_inout.vel_end = vel_imu + acc_imu * end_pose_dt;
+    state_inout.rot_end = R_imu * Exp(angvel_avr, end_pose_dt);
+    state_inout.pos_end =
+        pos_imu + vel_imu * end_pose_dt + 0.5 * acc_imu * end_pose_dt * end_pose_dt;
+
+    return state_inout;
 }
 
 void ImuProcess::SortPointCloudByOffsetTime(const MeasureGroup &meas, PointCloudXYZI &pcl_out)
@@ -270,7 +292,7 @@ bool ImuProcess::CalAngVelAndAccVel(V3D &angvel_avr, V3D &acc_avr, double &dt,
                                     sensor_msgs::ImuConstPtr &tail,
                                     const StatesGroup &state_inout)
 {
-    if (tail->header.stamp.toSec() < last_lidar_end_time)
+    if (tail->header.stamp.toSec() < state_inout.last_update_time)
         return false;
 
     angvel_avr << 0.5 * (head->angular_velocity.x + tail->angular_velocity.x),
@@ -283,9 +305,9 @@ bool ImuProcess::CalAngVelAndAccVel(V3D &angvel_avr, V3D &acc_avr, double &dt,
     angvel_avr -= state_inout.bias_g;
     acc_avr = acc_avr * G_m_s2 / mean_acc.norm() - state_inout.bias_a; // 原来代码
 
-    if (head->header.stamp.toSec() < last_lidar_end_time)
+    if (head->header.stamp.toSec() < state_inout.last_update_time)
     {
-        dt = tail->header.stamp.toSec() - last_lidar_end_time;
+        dt = tail->header.stamp.toSec() - state_inout.last_update_time;
     }
     else
     {
@@ -441,12 +463,10 @@ void ImuProcess::Process(const MeasureGroup &meas, StatesGroup &stat,
         return;
     }
 
-    // UndistortPcl(meas, stat, *cur_pcl_un_);
-    // NewUndistortPcl(meas, stat, *cur_pcl_un_);
     LicPointCloudUndistort(meas, stat, *cur_pcl_un_);
 
     LicStatePropagate(meas, stat);
 
     last_imu_ = meas.imu.back();
-    last_lidar_end_time = (meas.lidar->points.back().curvature != 0) ? (meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000)) : meas.lidar_sec_time;
+    stat.last_update_time = (meas.lidar->points.back().curvature != 0) ? (meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000)) : meas.lidar_sec_time;
 }

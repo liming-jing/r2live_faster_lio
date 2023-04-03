@@ -78,6 +78,11 @@ private:
     void NewUndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout,
                          PointCloudXYZI &pcl_in_out);
 
+public:
+    StatesGroup ImuPreintegration(const StatesGroup &state_in,
+                                  std::deque<sensor_msgs::Imu::ConstPtr> &v_imu,
+                                  int if_multiply_g, double end_pose_dt);
+
 private:
     void LicPointCloudUndistort(const MeasureGroup &meas, const StatesGroup &state_in, PointCloudXYZI &pcl_out);
 

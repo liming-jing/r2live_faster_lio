@@ -77,7 +77,7 @@ void VoxelMapping::Init(ros::NodeHandle &nh)
     }
 
     path.header.stamp = ros::Time::now();
-    path.header.frame_id = "camera_init";
+    path.header.frame_id = "world";
 
     downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min,
                                    filter_size_surf_min);
@@ -107,7 +107,7 @@ void VoxelMapping::Init(ros::NodeHandle &nh)
     publish_count = 0;
     last_timestamp_imu = -1.0;
     last_timestamp_lidar = -1.0;
-    first_lidar_time = 0;
+    first_lidar_time_ = 0;
     total_residual = 0.0;
     effct_feat_num = 0;
 
@@ -236,10 +236,23 @@ bool VoxelMapping::sync_packages(MeasureGroup &meas)
 
 void VoxelMapping::Run()
 {
-    // signal(SIGINT, SigHandle);
+    // g_camera_lidar_queue.m_liar_frame_buf = &lidar_buffer;
+    g_camera_lidar_queue.m_lidar_time_buf = &time_buffer;
     while (true)
     {
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        while (g_camera_lidar_queue.if_lidar_can_process() == false)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        std::unique_lock<std::mutex> lock(m_mutex_lio_process);
+
         if (!sync_packages(Measures))
+            continue;
+
+        if (g_camera_lidar_queue.m_if_lidar_can_start == 0)
             continue;
 
         if (flg_reset)
@@ -252,22 +265,26 @@ void VoxelMapping::Run()
 
         p_imu->Process(Measures, g_lio_state, feats_undistort);
 
+        g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
+        g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
+
         state_propagat = g_lio_state;
 
         if (is_first_frame)
         {
-            first_lidar_time = Measures.lidar_beg_time;
+            first_lidar_time_ = Measures.lidar_beg_time;
+            g_lio_state.last_update_time = first_lidar_time_;
             is_first_frame = false;
         }
 
         if (feats_undistort->empty() || (feats_undistort == NULL))
         {
-            p_imu->first_lidar_time = first_lidar_time;
+            p_imu->first_lidar_time = first_lidar_time_;
             LOG(WARNING) << "FAST-LIO not ready";
             continue;
         }
 
-        flg_EKF_inited = (Measures.lidar_beg_time - first_lidar_time) < kInitTime ? false : true;
+        flg_EKF_inited = (Measures.lidar_beg_time - first_lidar_time_) < kInitTime ? false : true;
 
         if (flg_EKF_inited && !init_map)
         {
@@ -326,10 +343,6 @@ void VoxelMapping::InitVoxelMap()
               g_lio_state.cov.block<3, 3>(3, 3);
         pv.cov = cov;
         pv_list.push_back(pv);
-        // Eigen::Vector3d sigma_pv = pv.cov.diagonal();
-        // sigma_pv[0] = sqrt(sigma_pv[0]);
-        // sigma_pv[1] = sqrt(sigma_pv[1]);
-        // sigma_pv[2] = sqrt(sigma_pv[2]);
     }
 
     buildVoxelMap(pv_list, max_voxel_size, max_layer, layer_size,
@@ -410,7 +423,6 @@ void VoxelMapping::ThreeSigmaCriterion(std::vector<ptpl> &ptpl_list, const std::
               t_var;
         pv.cov = cov;
         pv_list.push_back(pv);
-        // var_list.push_back(cov);
     }
     auto scan_match_time_start = std::chrono::high_resolution_clock::now();
     std::vector<V3D> non_match_list;
@@ -514,7 +526,7 @@ void VoxelMapping::UpdateState(const Eigen::MatrixXd &Hsub, const Eigen::MatrixX
                 .inverse();
         solution = K_init * z_init;
 
-        g_lio_state.resetpose();
+        // g_lio_state.resetpose();
         EKF_stop_flg = true;
     }
     else
@@ -651,7 +663,7 @@ void VoxelMapping::Publish()
     pcl::toROSMsg(*world_lidar, pub_cloud);
     pub_cloud.header.stamp =
         ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    pub_cloud.header.frame_id = "camera_init";
+    pub_cloud.header.frame_id = "world";
 
     if (publish_point_cloud)
     {
@@ -687,7 +699,7 @@ void VoxelMapping::publish_frame_world(const ros::Publisher &pubLaserCloudFullRe
     pcl::toROSMsg(*laserCloudWorldPub, laserCloudmsg);
     laserCloudmsg.header.stamp =
         ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    laserCloudmsg.header.frame_id = "camera_init";
+    laserCloudmsg.header.frame_id = "world";
     pubLaserCloudFullRes.publish(laserCloudmsg);
 }
 
@@ -709,7 +721,7 @@ void VoxelMapping::publish_effect_world(const ros::Publisher &pubLaserCloudEffec
     m_line.color.b = 1.0;
     m_line.scale.x = 0.01;
     m_line.pose.orientation.w = 1.0;
-    m_line.header.frame_id = "camera_init";
+    m_line.header.frame_id = "world";
     for (int i = 0; i < ptpl_list.size(); i++)
     {
         Eigen::Vector3d p_c = ptpl_list[i].point;
@@ -746,7 +758,7 @@ void VoxelMapping::publish_effect_world(const ros::Publisher &pubLaserCloudEffec
     pcl::toROSMsg(*effect_cloud_world, laserCloudFullRes3);
     laserCloudFullRes3.header.stamp =
         ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    laserCloudFullRes3.header.frame_id = "camera_init";
+    laserCloudFullRes3.header.frame_id = "world";
     pubLaserCloudEffect.publish(laserCloudFullRes3);
 }
 
@@ -756,7 +768,7 @@ void VoxelMapping::publish_no_effect(const ros::Publisher &pubLaserCloudNoEffect
     pcl::toROSMsg(*laserCloudNoeffect, laserCloudFullRes3);
     laserCloudFullRes3.header.stamp =
         ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    laserCloudFullRes3.header.frame_id = "camera_init";
+    laserCloudFullRes3.header.frame_id = "world";
     pubLaserCloudNoEffect.publish(laserCloudFullRes3);
 }
 
@@ -786,13 +798,13 @@ void VoxelMapping::publish_effect(const ros::Publisher &pubLaserCloudEffect)
     pcl::toROSMsg(*laserCloudWorld, laserCloudFullRes3);
     laserCloudFullRes3.header.stamp =
         ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    laserCloudFullRes3.header.frame_id = "camera_init";
+    laserCloudFullRes3.header.frame_id = "world";
     pubLaserCloudEffect.publish(laserCloudFullRes3);
 }
 
 void VoxelMapping::publish_odometry(const ros::Publisher &pubOdomAftMapped)
 {
-    odomAftMapped.header.frame_id = "camera_init";
+    odomAftMapped.header.frame_id = "world";
     odomAftMapped.child_frame_id = "aft_mapped";
     odomAftMapped.header.stamp =
         ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
@@ -808,7 +820,7 @@ void VoxelMapping::publish_odometry(const ros::Publisher &pubOdomAftMapped)
     q.setZ(geoQuat.z);
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, odomAftMapped.header.stamp,
-                                          "camera_init", "aft_mapped"));
+                                          "world", "aft_mapped"));
 
     pubOdomAftMapped.publish(odomAftMapped);
 }
@@ -825,7 +837,7 @@ void VoxelMapping::publish_path(const ros::Publisher pubPath)
 {
     set_posestamp(msg_body_pose.pose);
     msg_body_pose.header.stamp = ros::Time::now();
-    msg_body_pose.header.frame_id = "camera_init";
+    msg_body_pose.header.frame_id = "world";
     path.poses.push_back(msg_body_pose);
     pubPath.publish(path);
 }

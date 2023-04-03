@@ -42,6 +42,7 @@
 
 constexpr double kInitTime = 0.0;
 
+extern Camera_Lidar_queue g_camera_lidar_queue;
 extern StatesGroup g_lio_state;
 extern MeasureGroup Measures;
 class VoxelMapping
@@ -124,6 +125,11 @@ private:
     void publish_mavros(const ros::Publisher &mavros_pose_publisher);
     void publish_path(const ros::Publisher pubPath);
 
+public:
+    std::mutex m_mutex_lio_process;
+    std::shared_ptr<ImuProcess> p_imu;
+    double first_lidar_time_;
+
 private:
     VD(DIM_STATE)
     solution;
@@ -178,7 +184,6 @@ private:
     double lidar_end_time = 0;
     double last_timestamp_imu = -1.0;
     double last_timestamp_lidar = -1.0;
-    double first_lidar_time = 0;
 
     double total_residual = 0.0;
     int effct_feat_num = 0;
@@ -220,7 +225,6 @@ private:
     pcl::VoxelGrid<PointType> downSizeFilterMap;
 
     std::shared_ptr<Preprocess> p_pre;
-    std::shared_ptr<ImuProcess> p_imu;
 
     std::thread process;
 };
