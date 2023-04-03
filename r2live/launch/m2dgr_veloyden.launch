@@ -1,0 +1,20 @@
+<launch>
+
+    <rosparam command="load" file="$(find r2live)/../config/velodyne.yaml" />
+
+    <group if="1">
+        <node name="voxel_map_node" pkg="r2live" type="voxel_map_node" output="screen">
+                <!-- <param name="config_file" type="string" value="$(arg config_path)" />
+                <param name="vins_folder" type="string" value="$(arg vins_path)" /> -->
+                <param name="imu_topic" type="string" value="/handsfree/imu"/>  
+                <!-- <rosparam command="load" file="$(find r2live)/../config/lio_m2dgr_config.yaml" /> -->
+                <rosparam command="load" file="$(find r2live)/../config/velodyne.yaml" />
+        </node> 
+    </group>
+
+    <arg name="rviz" default="1" />
+    <group if="$(arg rviz)">
+        <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find r2live)/../config/rviz/voxel_mapping.rviz" />
+    </group>
+
+</launch>

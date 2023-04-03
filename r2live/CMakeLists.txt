@@ -54,42 +54,51 @@ include_directories(
   ./src/tools/
 )
 
-add_executable(lio_feat_extract 
-              src/apps/lio_feature_extract_node.cc
-              src/fast_lio/src/feature_extract.cc
-              src/fast_lio/src/parameter_server.cc
+
+add_executable(voxel_map_node 
+
+              src/apps/voxel_map_node.cc
+
+
+              src/fast_lio/src/imu_processing.cc
+              src/fast_lio/src/preprocess.cc
+              # src/fast_lio/src/parameter_server.cc
+              src/fast_lio/src/voxel_map_util.cc
+              src/fast_lio/src/voxel_mapping.cc
 )
-target_link_libraries(lio_feat_extract ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
 
-add_executable(r2live
-    src/estimator_node.cpp
-    src/parameters.cpp
-    src/estimator.cpp
-    src/estimator_optimization.cpp
-    src/feature_manager.cpp
-    src/factor/pose_local_parameterization.cpp
-    src/factor/projection_factor.cpp
-    src/factor/projection_td_factor.cpp
-    src/utility/utility.cpp
-    src/utility/visualization.cpp
-    src/utility/CameraPoseVisualization.cpp
-    src/initial/solve_5pts.cpp
-    src/initial/initial_aligment.cpp
-    src/initial/initial_sfm.cpp
-    src/initial/initial_ex_rotation.cpp
-    src/fast_lio/include/kd_tree/ikd_Tree.cpp
-    src/fast_lio/include/FOV_Checker/FOV_Checker.cpp 
+target_link_libraries(voxel_map_node ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES})
+
+# add_executable(r2live
+#     src/estimator_node.cpp
+#     src/parameters.cpp
+#     src/estimator.cpp
+#     src/estimator_optimization.cpp
+#     src/feature_manager.cpp
+#     src/factor/pose_local_parameterization.cpp
+#     src/factor/projection_factor.cpp
+#     src/factor/projection_td_factor.cpp
+#     src/utility/utility.cpp
+#     src/utility/visualization.cpp
+#     src/utility/CameraPoseVisualization.cpp
+#     src/initial/solve_5pts.cpp
+#     src/initial/initial_aligment.cpp
+#     src/initial/initial_sfm.cpp
+#     src/initial/initial_ex_rotation.cpp
+#     src/fast_lio/include/kd_tree/ikd_Tree.cpp
+#     src/fast_lio/include/FOV_Checker/FOV_Checker.cpp 
     
-    # src/fast_lio/IMU_Processing.cpp
+#     # src/fast_lio/IMU_Processing.cpp
 
-    src/fast_lio/src/fast_lio.cc 
-    src/fast_lio/src/lio_core.cc 
-    src/fast_lio/src/pointcloud_map.cc 
-    src/fast_lio/src/parameter_server.cc
-    src/fast_lio/src/imu_process.cc
-    )
+#     src/fast_lio/src/fast_lio.cc 
+#     src/fast_lio/src/lio_core.cc 
+#     src/fast_lio/src/pointcloud_map.cc 
+#     src/fast_lio/src/parameter_server.cc
+#     src/fast_lio/src/imu_process.cc
+#     src/fast_lio/src/voxel_map_util.cc
+#     )
 
-target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
+# target_link_libraries(r2live ${catkin_LIBRARIES} ${ALL_TARGET_LIBRARIES}) 
 
 
 

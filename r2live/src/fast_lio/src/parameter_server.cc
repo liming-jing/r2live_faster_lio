@@ -1,8 +1,8 @@
 #include "../include/parameter_server.h"
 
-ParameterServer* ParameterServer::instance = nullptr;
+ParameterServer *ParameterServer::instance = nullptr;
 
-void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
+void ParameterServer::InitParamWithRos(ros::NodeHandle &nh)
 {
     /*fast_lio parameters*/
     nh.param<std::string>("imu_topic", imu_topic_, "/livox/imu");
@@ -23,6 +23,5 @@ void ParameterServer::InitParamWithRos(ros::NodeHandle & nh)
 
     /* feature parameters */
     // nh.param<int>("feature_extraction/N_SCANS", N_SCANS_, 1);
-    GetROSParameter(nh,"feature_extraction/N_SCANS", n_scans_, 1800);
+    GetROSParameter(nh, "feature_extraction/N_SCANS", n_scans_, 1800);
 }
-
