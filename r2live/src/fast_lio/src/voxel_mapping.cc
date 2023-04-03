@@ -250,9 +250,9 @@ void VoxelMapping::Run()
             continue;
         }
 
-        p_imu->Process(Measures, state, feats_undistort);
+        p_imu->Process(Measures, g_lio_state, feats_undistort);
 
-        state_propagat = state;
+        state_propagat = g_lio_state;
 
         if (is_first_frame)
         {
@@ -298,8 +298,8 @@ void VoxelMapping::InitVoxelMap()
 {
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(
         new pcl::PointCloud<pcl::PointXYZI>);
-    Eigen::Quaterniond q(state.rot_end);
-    transformLidar(state, p_imu, feats_undistort, world_lidar);
+    Eigen::Quaterniond q(g_lio_state.rot_end);
+    transformLidar(g_lio_state, p_imu, feats_undistort, world_lidar);
     std::vector<pointWithCov> pv_list;
     for (size_t i = 0; i < world_lidar->size(); i++)
     {
@@ -320,10 +320,10 @@ void VoxelMapping::InitVoxelMap()
         point_this += Lidar_offset_to_IMU;
         M3D point_crossmat;
         point_crossmat << SKEW_SYM_MATRX(point_this);
-        cov = state.rot_end * cov * state.rot_end.transpose() +
-              (-point_crossmat) * state.cov.block<3, 3>(0, 0) *
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose() +
+              (-point_crossmat) * g_lio_state.cov.block<3, 3>(0, 0) *
                   (-point_crossmat).transpose() +
-              state.cov.block<3, 3>(3, 3);
+              g_lio_state.cov.block<3, 3>(3, 3);
         pv.cov = cov;
         pv_list.push_back(pv);
         // Eigen::Vector3d sigma_pv = pv.cov.diagonal();
@@ -381,8 +381,8 @@ void VoxelMapping::BodyVarAndCrossmatList(std::vector<M3D> &body_var, std::vecto
         M3D point_crossmat;
         point_crossmat << SKEW_SYM_MATRX(point_this);
         crossmat_list.push_back(point_crossmat);
-        M3D rot_var = state.cov.block<3, 3>(0, 0);
-        M3D t_var = state.cov.block<3, 3>(3, 3);
+        M3D rot_var = g_lio_state.cov.block<3, 3>(0, 0);
+        M3D t_var = g_lio_state.cov.block<3, 3>(3, 3);
         body_var.push_back(cov);
     }
 }
@@ -391,7 +391,7 @@ void VoxelMapping::ThreeSigmaCriterion(std::vector<ptpl> &ptpl_list, const std::
 {
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(
         new pcl::PointCloud<pcl::PointXYZI>);
-    transformLidar(state, p_imu, feats_down_body, world_lidar);
+    transformLidar(g_lio_state, p_imu, feats_down_body, world_lidar);
 
     std::vector<pointWithCov> pv_list;
     for (size_t i = 0; i < feats_down_body->size(); i++)
@@ -403,9 +403,9 @@ void VoxelMapping::ThreeSigmaCriterion(std::vector<ptpl> &ptpl_list, const std::
             world_lidar->points[i].z;
         M3D cov = body_var[i];
         M3D point_crossmat = crossmat_list[i];
-        M3D rot_var = state.cov.block<3, 3>(0, 0);
-        M3D t_var = state.cov.block<3, 3>(3, 3);
-        cov = state.rot_end * cov * state.rot_end.transpose() +
+        M3D rot_var = g_lio_state.cov.block<3, 3>(0, 0);
+        M3D t_var = g_lio_state.cov.block<3, 3>(3, 3);
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose() +
               (-point_crossmat) * rot_var * (-point_crossmat.transpose()) +
               t_var;
         pv.cov = cov;
@@ -457,12 +457,12 @@ void VoxelMapping::CalJacobianMatrix(const std::vector<ptpl> &ptpl_list, Eigen::
 
         calcBodyCov(point_this, ranging_cov, angle_cov, cov);
 
-        cov = state.rot_end * cov * state.rot_end.transpose();
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose();
         M3D point_crossmat;
         point_crossmat << SKEW_SYM_MATRX(point_this);
         const PointType &norm_p = corr_normvect->points[i];
         V3D norm_vec(norm_p.x, norm_p.y, norm_p.z);
-        V3D point_world = state.rot_end * point_this + state.pos_end;
+        V3D point_world = g_lio_state.rot_end * point_this + g_lio_state.pos_end;
         // /*** get the normal vector of closest surface/corner ***/
         Eigen::Matrix<double, 1, 6> J_nq;
         J_nq.block<1, 3>(0, 0) = point_world - ptpl_list[i].center;
@@ -480,7 +480,7 @@ void VoxelMapping::CalJacobianMatrix(const std::vector<ptpl> &ptpl_list, Eigen::
             sqrt(sigma_l + norm_vec.transpose() * cov * norm_vec);
 
         /*** calculate the Measuremnt Jacobian matrix H ***/
-        V3D A(point_crossmat * state.rot_end.transpose() * norm_vec);
+        V3D A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
         Hsub.row(i) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
         Hsub_T_R_inv.col(i) << A[0] * R_inv(i), A[1] * R_inv(i),
             A[2] * R_inv(i), norm_p.x * R_inv(i), norm_p.y * R_inv(i),
@@ -504,17 +504,17 @@ void VoxelMapping::UpdateState(const Eigen::MatrixXd &Hsub, const Eigen::MatrixX
         H_init.block<3, 3>(0, 0) = M3D::Identity();
         H_init.block<3, 3>(3, 3) = M3D::Identity();
         H_init.block<3, 3>(6, 15) = M3D::Identity();
-        z_init.block<3, 1>(0, 0) = -Log(state.rot_end);
-        z_init.block<3, 1>(0, 0) = -state.pos_end;
+        z_init.block<3, 1>(0, 0) = -Log(g_lio_state.rot_end);
+        z_init.block<3, 1>(0, 0) = -g_lio_state.pos_end;
 
         auto H_init_T = H_init.transpose();
         auto &&K_init =
-            state.cov * H_init_T *
-            (H_init * state.cov * H_init_T + 0.0001 * MD(9, 9)::Identity())
+            g_lio_state.cov * H_init_T *
+            (H_init * g_lio_state.cov * H_init_T + 0.0001 * MD(9, 9)::Identity())
                 .inverse();
         solution = K_init * z_init;
 
-        state.resetpose();
+        g_lio_state.resetpose();
         EKF_stop_flg = true;
     }
     else
@@ -522,12 +522,12 @@ void VoxelMapping::UpdateState(const Eigen::MatrixXd &Hsub, const Eigen::MatrixX
         auto &&Hsub_T = Hsub.transpose();
         H_T_H.block<6, 6>(0, 0) = Hsub_T_R_inv * Hsub;
         MD(DIM_STATE, DIM_STATE) &&K_1 =
-            (H_T_H + (state.cov).inverse()).inverse();
+            (H_T_H + (g_lio_state.cov).inverse()).inverse();
         K = K_1.block<DIM_STATE, 6>(0, 0) * Hsub_T_R_inv;
-        auto vec = state_propagat - state;
+        auto vec = state_propagat - g_lio_state;
         solution = K * meas_vec + vec - K * Hsub * vec.block<6, 1>(0, 0);
 
-        state += solution;
+        g_lio_state += solution;
 
         rot_add = solution.block<3, 1>(0, 0);
         t_add = solution.block<3, 1>(3, 0);
@@ -541,7 +541,7 @@ void VoxelMapping::UpdateState(const Eigen::MatrixXd &Hsub, const Eigen::MatrixX
 
 bool VoxelMapping::ConvergenceJudgements(int iterCount, const Eigen::MatrixXd &K, const Eigen::MatrixXd &Hsub)
 {
-    euler_cur = RotMtoEuler(state.rot_end);
+    euler_cur = RotMtoEuler(g_lio_state.rot_end);
 
     nearest_search_en = false;
     if (flg_EKF_converged ||
@@ -560,7 +560,7 @@ bool VoxelMapping::ConvergenceJudgements(int iterCount, const Eigen::MatrixXd &K
             /*** Covariance Update ***/
             G.setZero();
             G.block<DIM_STATE, 6>(0, 0) = K * Hsub;
-            state.cov = (I_STATE - G) * state.cov;
+            g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
 
             geoQuat = tf::createQuaternionMsgFromRollPitchYaw(
                 euler_cur(0), euler_cur(1), euler_cur(2));
@@ -575,7 +575,7 @@ void VoxelMapping::UpdateVoxelMap(const std::vector<M3D> &body_var, const std::v
 {
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(
         new pcl::PointCloud<pcl::PointXYZI>);
-    transformLidar(state, p_imu, feats_down_body, world_lidar);
+    transformLidar(g_lio_state, p_imu, feats_down_body, world_lidar);
     std::vector<pointWithCov> pv_list;
     for (size_t i = 0; i < world_lidar->size(); i++)
     {
@@ -584,10 +584,10 @@ void VoxelMapping::UpdateVoxelMap(const std::vector<M3D> &body_var, const std::v
             world_lidar->points[i].z;
         M3D point_crossmat = crossmat_list[i];
         M3D cov = body_var[i];
-        cov = state.rot_end * cov * state.rot_end.transpose() +
-              (-point_crossmat) * state.cov.block<3, 3>(0, 0) *
+        cov = g_lio_state.rot_end * cov * g_lio_state.rot_end.transpose() +
+              (-point_crossmat) * g_lio_state.cov.block<3, 3>(0, 0) *
                   (-point_crossmat).transpose() +
-              state.cov.block<3, 3>(3, 3);
+              g_lio_state.cov.block<3, 3>(3, 3);
         pv.cov = cov;
         pv_list.push_back(pv);
     }
@@ -601,7 +601,7 @@ void VoxelMapping::pointBodyToWorld(PointType const *const pi, PointType *const 
 {
     V3D p_body(pi->x, pi->y, pi->z);
     p_body = p_body + Lidar_offset_to_IMU;
-    V3D p_global(state.rot_end * (p_body) + state.pos_end);
+    V3D p_global(g_lio_state.rot_end * (p_body) + g_lio_state.pos_end);
     po->x = p_global(0);
     po->y = p_global(1);
     po->z = p_global(2);
@@ -611,7 +611,7 @@ void VoxelMapping::pointBodyToWorld(PointType const *const pi, PointType *const 
 void VoxelMapping::RGBpointBodyToWorld(PointType const *const pi, PointType *const po)
 {
     V3D p_body(pi->x, pi->y, pi->z);
-    V3D p_global(state.rot_end * (p_body) + state.pos_end);
+    V3D p_global(g_lio_state.rot_end * (p_body) + g_lio_state.pos_end);
     po->x = p_global(0);
     po->y = p_global(1);
     po->z = p_global(2);
@@ -637,7 +637,7 @@ void VoxelMapping::Publish()
     tf::Transform transform;
     tf::Quaternion q;
     transform.setOrigin(
-        tf::Vector3(state.pos_end(0), state.pos_end(1), state.pos_end(2)));
+        tf::Vector3(g_lio_state.pos_end(0), g_lio_state.pos_end(1), g_lio_state.pos_end(2)));
     q.setW(geoQuat.w);
     q.setX(geoQuat.x);
     q.setY(geoQuat.y);
@@ -646,7 +646,7 @@ void VoxelMapping::Publish()
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(
         new pcl::PointCloud<pcl::PointXYZI>);
-    transformLidar(state, p_imu, feats_down_body, world_lidar);
+    transformLidar(g_lio_state, p_imu, feats_down_body, world_lidar);
     sensor_msgs::PointCloud2 pub_cloud;
     pcl::toROSMsg(*world_lidar, pub_cloud);
     pub_cloud.header.stamp =
@@ -713,7 +713,7 @@ void VoxelMapping::publish_effect_world(const ros::Publisher &pubLaserCloudEffec
     for (int i = 0; i < ptpl_list.size(); i++)
     {
         Eigen::Vector3d p_c = ptpl_list[i].point;
-        Eigen::Vector3d p_w = state.rot_end * (p_c) + state.pos_end;
+        Eigen::Vector3d p_w = g_lio_state.rot_end * (p_c) + g_lio_state.pos_end;
         pcl::PointXYZRGB pi;
         pi.x = p_w[0];
         pi.y = p_w[1];
@@ -801,7 +801,7 @@ void VoxelMapping::publish_odometry(const ros::Publisher &pubOdomAftMapped)
     tf::Transform transform;
     tf::Quaternion q;
     transform.setOrigin(
-        tf::Vector3(state.pos_end(0), state.pos_end(1), state.pos_end(2)));
+        tf::Vector3(g_lio_state.pos_end(0), g_lio_state.pos_end(1), g_lio_state.pos_end(2)));
     q.setW(geoQuat.w);
     q.setX(geoQuat.x);
     q.setY(geoQuat.y);

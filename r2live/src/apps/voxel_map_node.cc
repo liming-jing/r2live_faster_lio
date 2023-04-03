@@ -3,7 +3,6 @@
 #include <glog/logging.h>
 
 #include "common_lib.h"
-#include "parameter_server.h"
 
 #include "voxel_mapping.h"
 
@@ -20,10 +19,6 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "voxel_map_node");
     ros::NodeHandle nh;
 
-    // ParameterServer *para_server = ParameterServer::GetInstance();
-    // para_server->InitParamWithRos(nh);
-
-    // std::shared_ptr<FastLio> fast_lio = std::make_shared<FastLio>(nh);
     std::shared_ptr<VoxelMapping> voxel_map_ptr = std::make_shared<VoxelMapping>(nh);
 
     ros::spin();

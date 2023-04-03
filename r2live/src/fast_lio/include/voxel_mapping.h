@@ -42,6 +42,8 @@
 
 constexpr double kInitTime = 0.0;
 
+extern StatesGroup g_lio_state;
+extern MeasureGroup Measures;
 class VoxelMapping
 {
 public:
@@ -81,7 +83,7 @@ private:
     {
         V3D p_body(pi[0], pi[1], pi[2]);
         p_body = p_body + Lidar_offset_to_IMU;
-        V3D p_global(state.rot_end * (p_body) + state.pos_end);
+        V3D p_global(g_lio_state.rot_end * (p_body) + g_lio_state.pos_end);
         po[0] = p_global(0);
         po[1] = p_global(1);
         po[2] = p_global(2);
@@ -90,9 +92,9 @@ private:
     template <typename T>
     void set_posestamp(T &out)
     {
-        out.position.x = state.pos_end(0);
-        out.position.y = state.pos_end(1);
-        out.position.z = state.pos_end(2);
+        out.position.x = g_lio_state.pos_end(0);
+        out.position.y = g_lio_state.pos_end(1);
+        out.position.z = g_lio_state.pos_end(2);
         out.orientation.x = geoQuat.x;
         out.orientation.y = geoQuat.y;
         out.orientation.z = geoQuat.z;
@@ -131,8 +133,8 @@ private:
     StatesGroup state_propagat;
 
 private:
-    MeasureGroup Measures;
-    StatesGroup state;
+    // MeasureGroup Measures;
+    // StatesGroup g_lio_state;
 
     std::string lid_topic, imu_topic;
     double ranging_cov = 0.0;
