@@ -1,61 +1,67 @@
 #ifndef COMMON_LIB_H
 #define COMMON_LIB_H
 
-#include <so3_math.h>
 #include <Eigen/Eigen>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <r2live/States.h>
-#include <r2live/Pose6D.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/PointCloud.h>
-#include <nav_msgs/Odometry.h>
-#include <rosbag/bag.h>
-
-#include <tf/transform_broadcaster.h>
 #include <eigen_conversions/eigen_msg.h>
-#include "tools_color_printf.hpp"
-#include "tools_eigen.hpp"
-#include <queue>
-#include <deque>
-#include "r2live_sophus/se3.hpp"
-#include "r2live_sophus/so3.hpp"
-// #define DEBUG_PRINT
-#define USE_ikdtree
-#define ESTIMATE_GRAVITY 0
-// #define USE_FOV_Checker
+#include <nav_msgs/Odometry.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <sensor_msgs/Imu.h>
+#include <so3_math.h>
+#include <tf/transform_broadcaster.h>
+#include <r2live/Pose6D.h>
+#include <r2live/States.h>
 
-#define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
+#include <ros/ros.h>
+#include <rosbag/bag.h>
+#include <sensor_msgs/PointCloud2.h>
+
+#include "tools_color_printf.hpp"
+
+using namespace std;
+using namespace Eigen;
 
 #define PI_M (3.14159265358)
-#define G_m_s2 (9.805)     // Gravaty const in GuangDong/China
-#define DIM_OF_STATES (18) // Dimension of states (Let Dim(SO(3)) = 3)
-#define DIM_OF_PROC_N (12) // Dimension of process noise (Let Dim(SO(3)) = 3)
+#define G_m_s2 (9.81)  // Gravaty const in GuangDong/China
+#define DIM_STATE (18) // Dimension of states (Let Dim(SO(3)) = 3)
+#define DIM_OF_STATES (18)
+
+#define DIM_PROC_N (12) // Dimension of process noise (Let Dim(SO(3)) = 3)
 #define CUBE_LEN (6.0)
 #define LIDAR_SP_LEN (2)
-#define INIT_COV (0.0001)
+// old init
+#define INIT_COV (0.0000001)
+#define NUM_MATCH_POINTS (5)
+#define MAX_MEAS_DIM (10000)
 
 #define VEC_FROM_ARRAY(v) v[0], v[1], v[2]
 #define MAT_FROM_ARRAY(v) v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
 #define CONSTRAIN(v, min, max) ((v > min) ? ((v < max) ? v : max) : min)
 #define ARRAY_FROM_EIGEN(mat) mat.data(), mat.data() + mat.rows() * mat.cols()
-#define STD_VEC_FROM_EIGEN(mat) std::vector<decltype(mat)::Scalar>(mat.data(), mat.data() + mat.rows() * mat.cols())
-
-#define DEBUG_FILE_DIR(name) (std::string(std::string(ROOT_DIR) + "Log/" + name))
-// using vins_estimator = fast_lio;
+#define STD_VEC_FROM_EIGEN(mat)               \
+    vector<decltype(mat)::Scalar>(mat.data(), \
+                                  mat.data() + mat.rows() * mat.cols())
+#define DEBUG_FILE_DIR(name) (string(string(ROOT_DIR) + "Log/" + name))
 
 typedef r2live::Pose6D Pose6D;
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;
+typedef vector<PointType, Eigen::aligned_allocator<PointType>> PointVector;
+typedef Vector3d V3D;
+typedef Matrix3d M3D;
+typedef Vector3f V3F;
+typedef Matrix3f M3F;
+
+#define MD(a, b) Matrix<double, (a), (b)>
+#define VD(a) Matrix<double, (a), 1>
+#define MF(a, b) Matrix<float, (a), (b)>
+#define VF(a) Matrix<float, (a), 1>
 
 static const Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
-// Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+static const Eigen::Vector3d Lidar_offset_to_IMU(0, 0, 0);
 
 template <typename T>
 T get_ros_parameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
@@ -66,6 +72,14 @@ T get_ros_parameter(ros::NodeHandle &nh, const std::string parameter_name, T &pa
     return parameter;
 }
 
+template <typename T>
+T GetROSParameter(ros::NodeHandle &nh, const std::string parameter_name, T &parameter, T default_val)
+{
+    nh.param<T>(parameter_name.c_str(), parameter, default_val);
+    // ENABLE_SCREEN_PRINTF;
+    cout << "[Ros_parameter]: " << parameter_name << " ==> " << parameter << std::endl;
+    return parameter;
+}
 
 template <typename T = double>
 inline Eigen::Matrix<T, 3, 3> vec_to_hat(Eigen::Matrix<T, 3, 1> &omega)
@@ -81,50 +95,37 @@ inline Eigen::Matrix<T, 3, 3> vec_to_hat(Eigen::Matrix<T, 3, 1> &omega)
     return res_mat_33;
 }
 
-template < typename T = double > 
+template <typename T = double>
 T cot(const T theta)
 {
     return 1.0 / std::tan(theta);
 }
 
-template < typename T = double >
-inline Eigen::Matrix< T, 3, 3 > right_jacobian_of_rotion_matrix(const Eigen::Matrix< T, 3, 1 > & omega)
+template <typename T = double>
+Eigen::Matrix<T, 3, 3> inverse_right_jacobian_of_rotion_matrix(const Eigen::Matrix<T, 3, 1> &omega)
 {
-    //Barfoot, Timothy D, State estimation for robotics. Page 232-237
-    Eigen::Matrix< T, 3, 3>   res_mat_33;
+    // Barfoot, Timothy D, State estimation for robotics. Page 232-237
+    Eigen::Matrix<T, 3, 3> res_mat_33;
 
     T theta = omega.norm();
-    if(std::isnan(theta) || theta == 0)
-        return Eigen::Matrix< T, 3, 3>::Identity();
-    Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
-    res_mat_33 = sin(theta)/theta * Eigen::Matrix< T, 3, 3 >::Identity()
-                    + (1 - (sin(theta)/theta))*a*a.transpose() 
-                    + ((1 - cos(theta))/theta)*hat_a;
+    if (std::isnan(theta) || theta == 0)
+        return Eigen::Matrix<T, 3, 3>::Identity();
+    Eigen::Matrix<T, 3, 1> a = omega / theta;
+    Eigen::Matrix<T, 3, 3> hat_a = vec_to_hat(a);
+    res_mat_33 = (theta / 2) * (cot(theta / 2)) * Eigen::Matrix<T, 3, 3>::Identity() + (1 - (theta / 2) * (cot(theta / 2))) * a * a.transpose() + (theta / 2) * hat_a;
     // cout << "Omega: " << omega.transpose() << endl;
     // cout << "Res_mat_33:\r\n"  <<res_mat_33 << endl;
     return res_mat_33;
 }
 
-template < typename T = double >
-Eigen::Matrix< T, 3, 3 > inverse_right_jacobian_of_rotion_matrix(const Eigen::Matrix< T, 3, 1> & omega)
+struct MeasureGroup // Lidar data and imu dates for the curent process
 {
-    //Barfoot, Timothy D, State estimation for robotics. Page 232-237
-    Eigen::Matrix< T, 3, 3>   res_mat_33;
-
-    T theta = omega.norm();
-    if(std::isnan(theta) || theta == 0)
-        return Eigen::Matrix< T, 3, 3>::Identity();
-    Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
-    res_mat_33 = (theta / 2) * (cot(theta / 2)) * Eigen::Matrix<T, 3, 3>::Identity() 
-                + (1 - (theta / 2) * (cot(theta / 2))) * a * a.transpose() 
-                + (theta / 2) * hat_a;
-    // cout << "Omega: " << omega.transpose() << endl;
-    // cout << "Res_mat_33:\r\n"  <<res_mat_33 << endl;
-    return res_mat_33;
-}
-
+    MeasureGroup() { this->lidar.reset(new PointCloudXYZI()); };
+    double lidar_beg_time;
+    double lidar_sec_time;
+    PointCloudXYZI::Ptr lidar;
+    deque<sensor_msgs::Imu::ConstPtr> imu;
+};
 
 struct Camera_Lidar_queue
 {
@@ -150,7 +151,8 @@ struct Camera_Lidar_queue
     int m_if_dump_log = 1;
     rosbag::Bag m_bag_for_record;
 
-    std::deque<sensor_msgs::PointCloud2::ConstPtr> *m_liar_frame_buf = nullptr;
+    // std::deque<PointCloudXYZI::Ptr> *m_liar_frame_buf = nullptr;
+    std::deque<double> *m_lidar_time_buf = nullptr;
 
     void init_rosbag_for_recording()
     {
@@ -168,7 +170,7 @@ struct Camera_Lidar_queue
     };
     ~Camera_Lidar_queue(){};
 
-    double imu_in(const double &in_time)
+    void imu_in(const double &in_time)
     {
         if (m_first_imu_time < 0)
         {
@@ -206,9 +208,14 @@ struct Camera_Lidar_queue
 
     double get_lidar_front_time()
     {
-        if (m_liar_frame_buf != nullptr && m_liar_frame_buf->size())
+        // if (m_liar_frame_buf != nullptr && m_liar_frame_buf->size())
+        // {
+        //     // return m_liar_frame_buf->front()->header.stamp.toSec() + 0.1;
+        //     // return m_liar_frame_buf->front()->header.stamp;
+        // }
+        if (m_lidar_time_buf != nullptr && m_lidar_time_buf->size())
         {
-            return m_liar_frame_buf->front()->header.stamp.toSec() + 0.1;
+            return m_lidar_time_buf->front() + 0.1;
         }
         else
         {
@@ -287,7 +294,7 @@ struct Camera_Lidar_queue
         if (cam_last_time < 0 || lidar_last_time < 0)
         {
             // printf_line;
-            // cout << "Cam_tim = " << cam_last_time << ", lidar_last_time = " << lidar_last_time << endl; 
+            // cout << "Cam_tim = " << cam_last_time << ", lidar_last_time = " << lidar_last_time << endl;
             return false;
         }
 
@@ -311,18 +318,6 @@ struct Camera_Lidar_queue
         }
         return false;
     }
-};
-
-struct MeasureGroup // Lidar data and imu dates for the curent process
-{
-    MeasureGroup()
-    {
-        this->lidar.reset(new PointCloudXYZI());
-    };
-    double lidar_beg_time;
-    double lidar_end_time;
-    PointCloudXYZI::Ptr lidar;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu;
 };
 
 struct StatesGroup
@@ -416,7 +411,7 @@ struct StatesGroup
 
     static void display(const StatesGroup &state, std::string str = std::string("State: "))
     {
-        vec_3 angle_axis = Log(state.rot_end) * 57.3;
+        V3D angle_axis = Log(state.rot_end) * 57.3;
         printf("%s |", str.c_str());
         printf("[%.5f] | ", state.last_update_time);
         printf("(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
@@ -440,20 +435,15 @@ public:
 };
 
 template <typename T>
-T rad2deg(T radians)
-{
-    return radians * 180.0 / PI_M;
-}
+T rad2deg(T radians) { return radians * 180.0 / PI_M; }
 
 template <typename T>
-T deg2rad(T degrees)
-{
-    return degrees * PI_M / 180.0;
-}
+T deg2rad(T degrees) { return degrees * PI_M / 180.0; }
 
 template <typename T>
-auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Matrix<T, 3, 1> &g,
-                const Eigen::Matrix<T, 3, 1> &v, const Eigen::Matrix<T, 3, 1> &p, const Eigen::Matrix<T, 3, 3> &R)
+auto set_pose6d(const double t, const Matrix<T, 3, 1> &a,
+                const Matrix<T, 3, 1> &g, const Matrix<T, 3, 1> &v,
+                const Matrix<T, 3, 1> &p, const Matrix<T, 3, 3> &R)
 {
     Pose6D rot_kp;
     rot_kp.offset_time = t;
@@ -466,8 +456,80 @@ auto set_pose6d(const double t, const Eigen::Matrix<T, 3, 1> &a, const Eigen::Ma
         for (int j = 0; j < 3; j++)
             rot_kp.rot[i * 3 + j] = R(i, j);
     }
-    // Eigen::Map<Eigen::Matrix3d>(rot_kp.rot, 3,3) = R;
-    return std::move(rot_kp);
+    // Map<M3D>(rot_kp.rot, 3,3) = R;
+    return move(rot_kp);
+}
+
+/* comment
+plane equation: Ax + By + Cz + D = 0
+convert to: A/D*x + B/D*y + C/D*z = -1
+solve: A0*x0 = b0
+where A0_i = [x_i, y_i, z_i], x0 = [A/D, B/D, C/D]^T, b0 = [-1, ..., -1]^T
+normvec:  normalized x0
+*/
+template <typename T>
+bool esti_normvector(Matrix<T, 3, 1> &normvec, const PointVector &point,
+                     const T &threshold, const int &point_num)
+{
+    MatrixXf A(point_num, 3);
+    MatrixXf b(point_num, 1);
+    b.setOnes();
+    b *= -1.0f;
+
+    for (int j = 0; j < point_num; j++)
+    {
+        A(j, 0) = point[j].x;
+        A(j, 1) = point[j].y;
+        A(j, 2) = point[j].z;
+    }
+    normvec = A.colPivHouseholderQr().solve(b);
+
+    for (int j = 0; j < point_num; j++)
+    {
+        if (fabs(normvec(0) * point[j].x + normvec(1) * point[j].y +
+                 normvec(2) * point[j].z + 1.0f) > threshold)
+        {
+            return false;
+        }
+    }
+
+    normvec.normalize();
+    return true;
+}
+
+template <typename T>
+bool esti_plane(Matrix<T, 4, 1> &pca_result, const PointVector &point,
+                const T &threshold)
+{
+    Matrix<T, NUM_MATCH_POINTS, 3> A;
+    Matrix<T, NUM_MATCH_POINTS, 1> b;
+    b.setOnes();
+    b *= -1.0f;
+
+    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+    {
+        A(j, 0) = point[j].x;
+        A(j, 1) = point[j].y;
+        A(j, 2) = point[j].z;
+    }
+
+    Matrix<T, 3, 1> normvec = A.colPivHouseholderQr().solve(b);
+
+    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+    {
+        if (fabs(normvec(0) * point[j].x + normvec(1) * point[j].y +
+                 normvec(2) * point[j].z + 1.0f) > threshold)
+        {
+            return false;
+        }
+    }
+
+    T n = normvec.norm();
+    pca_result(0) = normvec(0) / n;
+    pca_result(1) = normvec(1) / n;
+    pca_result(2) = normvec(2) / n;
+    pca_result(3) = 1.0 / n;
+    return true;
 }
 
 #endif

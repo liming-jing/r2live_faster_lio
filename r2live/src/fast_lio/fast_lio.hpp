@@ -73,11 +73,9 @@
 // 引入ivox 数据结构
 #include "ivox3d/ivox3d.h"
 
-
-
 #define INIT_TIME (0)
 // #define LASER_POINT_COV (0.0015) // Ori
-#define LASER_POINT_COV (0.00015)    
+#define LASER_POINT_COV (0.00015)
 #define NUM_MATCH_POINTS (5)
 
 #define MAXN 360000
@@ -85,7 +83,7 @@ const int laserCloudWidth = 48;
 const int laserCloudHeight = 48;
 const int laserCloudDepth = 48;
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
-//estimator inputs and output;
+// estimator inputs and output;
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
 extern StatesGroup g_lio_state;
@@ -93,25 +91,25 @@ extern std::shared_ptr<ImuProcess> g_imu_process;
 extern double g_lidar_star_tim;
 
 #ifdef IVOX_NODE_TYPE_PHC
-    using IVoxType = IVox<3, IVoxNodeType::PHC, PointType>;
+using IVoxType = IVox<3, IVoxNodeType::PHC, PointType>;
 #else
-    using IVoxType = IVox<3, IVoxNodeType::DEFAULT, PointType>;
+using IVoxType = IVox<3, IVoxNodeType::DEFAULT, PointType>;
 #endif
 
 class Fast_lio
 {
 public:
-    std::mutex  m_mutex_lio_process;
+    std::mutex m_mutex_lio_process;
 
     std::shared_ptr<ImuProcess> m_imu_process;
     std::string root_dir = ROOT_DIR;
 
     std::string imu_topic;
 
-    IVoxType::Options ivox_options_; 
-    std::shared_ptr<IVoxType> ivox_ = nullptr;                    // localmap in ivox
+    IVoxType::Options ivox_options_;
+    std::shared_ptr<IVoxType> ivox_ = nullptr; // localmap in ivox
 
-    bool flg_first_scan_ = true;    
+    bool flg_first_scan_ = true;
 
     double m_maximum_pt_kdtree_dis = 1.0;
     double m_maximum_res_dis = 1.0;
@@ -155,14 +153,13 @@ public:
     std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
 
+    // surf feature in map
+    PointCloudXYZI::Ptr featsFromMap;    //(new PointCloudXYZI());
+    PointCloudXYZI::Ptr cube_points_add; //(new PointCloudXYZI());
+    // all points
+    PointCloudXYZI::Ptr laserCloudFullRes2; //   (new PointCloudXYZI());
 
-    //surf feature in map
-    PointCloudXYZI::Ptr featsFromMap;       //(new PointCloudXYZI());
-    PointCloudXYZI::Ptr cube_points_add;    //(new PointCloudXYZI());
-    //all points
-    PointCloudXYZI::Ptr laserCloudFullRes2;//   (new PointCloudXYZI());
-
-    Eigen::Vector3f XAxisPoint_body; //(LIDAR_SP_LEN, 0.0, 0.0);
+    Eigen::Vector3f XAxisPoint_body;  //(LIDAR_SP_LEN, 0.0, 0.0);
     Eigen::Vector3f XAxisPoint_world; //(LIDAR_SP_LEN, 0.0, 0.0);
 
     std::vector<BoxPointType> cub_needrm;
@@ -174,7 +171,6 @@ public:
     bool cube_updated[laserCloudNum];
     int laserCloudValidInd[laserCloudNum];
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
-
 
 #ifdef USE_ikdtree
     KD_TREE ikdtree;
@@ -211,7 +207,7 @@ public:
     /*** debug record ***/
     std::ofstream fout_pre, fout_out;
     // Fast_lio() = delete;
-    ros::NodeHandle             nh;
+    ros::NodeHandle nh;
 
     void SigHandle(int sig)
     {
@@ -220,7 +216,7 @@ public:
         sig_buffer.notify_all();
     }
 
-    //project lidar frame to world
+    // project lidar frame to world
     void pointBodyToWorld(PointType const *const pi, PointType *const po)
     {
         Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
@@ -321,9 +317,8 @@ public:
         float ang_cos = fabs(squaredSide1 <= 3) ? 1.0 : (LIDAR_SP_LEN * LIDAR_SP_LEN + squaredSide1 - squaredSide2) / (2 * LIDAR_SP_LEN * sqrt(squaredSide1));
 
         return ((ang_cos > HALF_FOV_COS) ? true : false);
-            std::unique_lock<std::mutex> lock(m_mutex_lio_process);
+        std::unique_lock<std::mutex> lock(m_mutex_lio_process);
     }
-
 
     void lasermap_fov_segment()
     {
@@ -394,7 +389,7 @@ public:
                         _last_inFOV[cube_ind(i, j, k)] = _last_inFOV[cube_ind(i + 1, j, k)];
                     }
 
-                        featsArray[cube_ind(i, j, k)] = laserCloudCubeSurfPointer;
+                    featsArray[cube_ind(i, j, k)] = laserCloudCubeSurfPointer;
                     _last_inFOV[cube_ind(i, j, k)] = last_inFOV_flag;
                     laserCloudCubeSurfPointer->clear();
                 }
@@ -705,12 +700,12 @@ public:
         readd_time = omp_get_wtime() - readd_begin - delete_box_time - readd_box_time;
         // s_plot6.push_back(omp_get_wtime() - t_begin);
     }
-    
+
     void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in)
     {
         sensor_msgs::PointCloud2::Ptr msg(new sensor_msgs::PointCloud2(*msg_in));
-        msg->header.stamp = ros::Time( msg_in->header.stamp.toSec() - m_lidar_time_delay );
-        if (g_camera_lidar_queue.lidar_in( msg_in->header.stamp.toSec() + 0.1 ) == 0)
+        msg->header.stamp = ros::Time(msg_in->header.stamp.toSec() - m_lidar_time_delay);
+        if (g_camera_lidar_queue.lidar_in(msg_in->header.stamp.toSec() + 0.1) == 0)
         {
             return;
         }
@@ -739,7 +734,7 @@ public:
         double timestamp = msg->header.stamp.toSec();
         g_camera_lidar_queue.imu_in(timestamp);
         mtx_buffer.lock();
-        
+
         if (timestamp < last_timestamp_imu)
         {
             ROS_ERROR("imu loop back, clear buffer");
@@ -748,7 +743,7 @@ public:
         }
 
         last_timestamp_imu = timestamp;
-        if (g_camera_lidar_queue.m_if_acc_mul_G) 
+        if (g_camera_lidar_queue.m_if_acc_mul_G)
         {
             msg->linear_acceleration.x *= G_m_s2;
             msg->linear_acceleration.y *= G_m_s2;
@@ -843,23 +838,31 @@ public:
 
         downSizeFilterSurf.setLeafSize(filter_size_surf_min, filter_size_surf_min, filter_size_surf_min_z);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
-       
 
         int ivox_nearby_type = 0;
-        get_ros_parameter(nh, "fast_lio/ivox_grid_resolution",  ivox_options_.resolution_, float(0.2));
+        get_ros_parameter(nh, "fast_lio/ivox_grid_resolution", ivox_options_.resolution_, float(0.2));
         get_ros_parameter(nh, "fast_lio/ivox_nearby_type", ivox_nearby_type, 18);
 
         ivox_ = std::make_shared<IVoxType>(ivox_options_);
 
-        if (ivox_nearby_type == 0) {
+        if (ivox_nearby_type == 0)
+        {
             ivox_options_.nearby_type_ = IVoxType::NearbyType::CENTER;
-        } else if (ivox_nearby_type == 6) {
+        }
+        else if (ivox_nearby_type == 6)
+        {
             ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY6;
-        } else if (ivox_nearby_type == 18) {
+        }
+        else if (ivox_nearby_type == 18)
+        {
             ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY18;
-        } else if (ivox_nearby_type == 26) {
+        }
+        else if (ivox_nearby_type == 26)
+        {
             ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY26;
-        } else {
+        }
+        else
+        {
             LOG(WARNING) << "unknown ivox_nearby_type, use NEARBY18";
             ivox_options_.nearby_type_ = IVoxType::NearbyType::NEARBY18;
         }
@@ -890,7 +893,7 @@ public:
         PointCloudXYZI::Ptr feats_down(new PointCloudXYZI());
         PointCloudXYZI::Ptr laserCloudOri(new PointCloudXYZI());
         PointCloudXYZI::Ptr coeffSel(new PointCloudXYZI());
-       
+
         /*** variables initialize ***/
 
         FOV_DEG = fov_deg + 10;
@@ -937,18 +940,18 @@ public:
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
             std::unique_lock<std::mutex> lock(m_mutex_lio_process);
-            if(1)
+            if (1)
             {
-                if(sync_packages(Measures)==0)
+                if (sync_packages(Measures) == 0)
                 {
                     continue;
                 }
-                if(g_camera_lidar_queue.m_if_lidar_can_start== 0)
-                {   
+                if (g_camera_lidar_queue.m_if_lidar_can_start == 0)
+                {
                     continue;
                 }
                 int lidar_can_update = 1;
-               
+
                 if (Measures.lidar_beg_time + 0.1 < g_lio_state.last_update_time)
                 {
                     if (1)
@@ -959,7 +962,7 @@ public:
                                  g_lio_state.last_update_time - Measures.lidar_beg_time);
                     }
                     lidar_can_update = 0;
-                    //continue;
+                    // continue;
                 }
                 else
                 {
@@ -970,7 +973,7 @@ public:
                                  g_camera_lidar_queue.m_last_imu_time - g_camera_lidar_queue.m_first_imu_time,
                                  g_lio_state.last_update_time - Measures.lidar_beg_time);
                     }
-                }                
+                }
                 // printf_line;
                 lidar_can_update = 1;
                 g_lidar_star_tim = first_lidar_time;
@@ -1030,7 +1033,7 @@ public:
                 lasermap_fov_segment();
 #endif
 
-#ifdef IVOX  
+#ifdef IVOX
                 // 首次插入点云数据
                 if (flg_first_scan_)
                 {
@@ -1042,7 +1045,7 @@ public:
 
 #endif
 
-                 /*** downsample the features of new frame ***/
+                /*** downsample the features of new frame ***/
                 downSizeFilterSurf.setInputCloud(feats_undistort);
                 downSizeFilterSurf.filter(*feats_down);
 
@@ -1077,7 +1080,7 @@ public:
                 int featsFromMapNum = featsFromMap->points.size();
 #endif
                 int feats_down_size = feats_down->points.size();
-                //std::cout << "[ mapping ]: Raw feature num: " << feats_undistort->points.size() << " downsamp num " << feats_down_size << " Map num: " << featsFromMapNum << " laserCloudValidNum " << laserCloudValidNum << std::endl;
+                // std::cout << "[ mapping ]: Raw feature num: " << feats_undistort->points.size() << " downsamp num " << feats_down_size << " Map num: " << featsFromMapNum << " laserCloudValidNum " << laserCloudValidNum << std::endl;
 
                 /*** ICP and iterated Kalman filter update ***/
                 PointCloudXYZI::Ptr coeffSel_tmpt(new PointCloudXYZI(*feats_down));
@@ -1120,7 +1123,7 @@ public:
 
                         /** closest surface search and residual computation **/
                         omp_set_num_threads(4);
-// #pragma omp parallel for
+                        // #pragma omp parallel for
                         for (int i = 0; i < feats_down_size; i++)
                         {
                             PointType &pointOri_tmpt = feats_down->points[i];
@@ -1180,20 +1183,20 @@ public:
 #endif
                             }
 
-                            //matA0*matX0=matB0
-                            //AX+BY+CZ+D = 0 <=> AX+BY+CZ=-D <=> (A/D)X+(B/D)Y+(C/D)Z = -1
+                            // matA0*matX0=matB0
+                            // AX+BY+CZ+D = 0 <=> AX+BY+CZ=-D <=> (A/D)X+(B/D)Y+(C/D)Z = -1
                             //(X,Y,Z)<=>mat_a0
-                            //A/D, B/D, C/D <=> mat_x0
+                            // A/D, B/D, C/D <=> mat_x0
 
-                            cv::solve(matA0, matB0, matX0, cv::DECOMP_QR); //TODO
+                            cv::solve(matA0, matB0, matX0, cv::DECOMP_QR); // TODO
 
                             float pa = matX0.at<float>(0, 0);
                             float pb = matX0.at<float>(1, 0);
                             float pc = matX0.at<float>(2, 0);
                             float pd = 1;
 
-                            //ps is the norm of the plane norm_vec vector
-                            //pd is the distance from point to plane
+                            // ps is the norm of the plane norm_vec vector
+                            // pd is the distance from point to plane
                             float ps = sqrt(pa * pa + pb * pb + pc * pc);
                             pa /= ps;
                             pb /= ps;
@@ -1203,7 +1206,7 @@ public:
                             bool planeValid = true;
                             for (int j = 0; j < NUM_MATCH_POINTS; j++)
                             {
-#ifdef USE_ikdtree              
+#ifdef USE_ikdtree
                                 // ANCHOR -  Planar check
                                 if (fabs(pa * points_near[j].x +
                                          pb * points_near[j].y +
@@ -1216,7 +1219,7 @@ public:
                                 {
                                     // ANCHOR - Far distance pt processing
                                     if (ori_pt_dis < maximum_pt_range * 0.90 || (ori_pt_dis < m_long_rang_pt_dis))
-                                    //if(1)
+                                    // if(1)
                                     {
                                         planeValid = false;
                                         point_selected_surf[i] = false;
@@ -1233,15 +1236,15 @@ public:
 
                             if (planeValid)
                             {
-                                //loss fuction
+                                // loss fuction
                                 float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
-                                //if(fabs(pd2) > 0.1) continue;
+                                // if(fabs(pd2) > 0.1) continue;
                                 float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y + pointSel_tmpt.z * pointSel_tmpt.z));
                                 // ANCHOR -  Point to plane distance
-                                //if ((s > 0.80)) // && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last)) // Ori: 0.90
-                                double acc_distance = (ori_pt_dis < m_long_rang_pt_dis) ? m_maximum_res_dis: 1.0;
-                                //double acc_distance = m_maximum_res_dis;
-                                if(pd2 < acc_distance)
+                                // if ((s > 0.80)) // && ((std::abs(pd2) - res_last[i]) < 3 * res_mean_last)) // Ori: 0.90
+                                double acc_distance = (ori_pt_dis < m_long_rang_pt_dis) ? m_maximum_res_dis : 1.0;
+                                // double acc_distance = m_maximum_res_dis;
+                                if (pd2 < acc_distance)
                                 {
                                     // if(std::abs(pd2) > 5 * res_mean_last)
                                     // {
@@ -1403,7 +1406,7 @@ public:
                         }
                         solve_time += omp_get_wtime() - solve_start;
                     }
-                    
+
                     t3 = omp_get_wtime();
 
                     /*** add new frame points to map ikdtree ***/
@@ -1487,8 +1490,6 @@ public:
                     t5 = omp_get_wtime();
                 }
 
-
-
                 /******* Publish current frame points in world coordinates:  *******/
                 laserCloudFullRes2->clear();
                 *laserCloudFullRes2 = dense_map_en ? (*feats_undistort) : (*feats_down);
@@ -1508,11 +1509,11 @@ public:
                     pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
                     // laserCloudFullRes3.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
                     laserCloudFullRes3.header.stamp.fromSec(Measures.lidar_end_time);
-                    laserCloudFullRes3.header.frame_id = "world";       // world; camera_init
+                    laserCloudFullRes3.header.frame_id = "world"; // world; camera_init
                     pubLaserCloudFullRes.publish(laserCloudFullRes3);
-                    if(g_camera_lidar_queue.m_if_write_res_to_bag)
+                    if (g_camera_lidar_queue.m_if_write_res_to_bag)
                     {
-                        g_camera_lidar_queue.m_bag_for_record.write(pubLaserCloudFullRes.getTopic(),laserCloudFullRes3.header.stamp, laserCloudFullRes3);
+                        g_camera_lidar_queue.m_bag_for_record.write(pubLaserCloudFullRes.getTopic(), laserCloudFullRes3.header.stamp, laserCloudFullRes3);
                     }
                 }
 
@@ -1537,7 +1538,7 @@ public:
                 sensor_msgs::PointCloud2 laserCloudMap;
                 pcl::toROSMsg(*featsFromMap, laserCloudMap);
                 // laserCloudMap.header.stamp = ros::Time::now(); //ros::Time().fromSec(last_timestamp_lidar);
-                laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); //ros::Time().fromSec(last_timestamp_lidar);
+                laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); // ros::Time().fromSec(last_timestamp_lidar);
                 laserCloudMap.header.frame_id = "world";
                 pubLaserCloudMap.publish(laserCloudMap);
 
@@ -1545,7 +1546,7 @@ public:
                 geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
                 odomAftMapped.header.frame_id = "world";
                 odomAftMapped.child_frame_id = "/aft_mapped";
-                odomAftMapped.header.stamp = ros::Time::now(); //ros::Time().fromSec(last_timestamp_lidar);
+                odomAftMapped.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
                 odomAftMapped.pose.pose.orientation.x = geoQuat.x;
                 odomAftMapped.pose.pose.orientation.y = geoQuat.y;
                 odomAftMapped.pose.pose.orientation.z = geoQuat.z;
@@ -1624,7 +1625,7 @@ public:
                 s_plot5[time_log_counter] = t5 - t0;
                 s_plot6[time_log_counter] = readd_box_time;
                 time_log_counter++;
-                
+
                 // std::cout << "[ mapping ]: time: fov_check " << fov_check_time << " copy map " << copy_time << " readd: " << readd_time << " match " << match_time << " solve " << solve_time << "acquire: " << t4 - t3 << " map incre " << t5 - t4 << " total " << aver_time_consu << std::endl;
                 // fout_out << std::setw(10) << Measures.lidar_beg_time << " " << euler_cur.transpose()*57.3 << " " << g_lio_state.pos_end.transpose() << " " << g_lio_state.vel_end.transpose() \
             // <<" "<<g_lio_state.bias_g.transpose()<<" "<<g_lio_state.bias_a.transpose()<< std::endl;

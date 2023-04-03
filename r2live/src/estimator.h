@@ -17,7 +17,7 @@
 #include "factor/projection_td_factor.h"
 #include "factor/lidar_prior.hpp"
 
-#include "./fast_lio/fast_lio.hpp"
+#include "./fast_lio/include/voxel_mapping.h"
 
 #include <unordered_map>
 #include <queue>
@@ -29,14 +29,14 @@
 
 class Estimator
 {
-  public:
+public:
     Estimator();
-    Fast_lio * m_fast_lio_instance = nullptr;
+    VoxelMapping *m_voxel_map_instance = nullptr;
     void setParameter();
 
     // interface
     void processIMU(double t, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
-    void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const std_msgs::Header &header, const StatesGroup & lio_state = StatesGroup() );
+    void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const std_msgs::Header &header, const StatesGroup &lio_state = StatesGroup());
 
     void solve_image_pose(const std_msgs::Header &header);
     void setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r);
@@ -69,7 +69,7 @@ class Estimator
     };
 
     SolverFlag solver_flag;
-    MarginalizationFlag  marginalization_flag;
+    MarginalizationFlag marginalization_flag;
     Vector3d m_gravity;
     MatrixXd Ap[2], backup_A;
     VectorXd bp[2], backup_b;
@@ -112,7 +112,6 @@ class Estimator
     vector<Vector3d> key_poses;
     double initial_timestamp;
 
-
     double m_para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
     double m_para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
     double m_para_Feature[NUM_OF_F][SIZE_FEATURE];
@@ -124,11 +123,11 @@ class Estimator
     int loop_window_index;
 
     vector<double *> m_last_marginalization_parameter_blocks;
-    vio_marginalization * m_vio_margin_ptr = nullptr;
+    vio_marginalization *m_vio_margin_ptr = nullptr;
     map<double, ImageFrame> m_all_image_frame;
     IntegrationBase *tmp_pre_integration;
 
-    //relocalization variable
+    // relocalization variable
     bool relocalization_info;
     double relo_frame_stamp;
     double relo_frame_index;

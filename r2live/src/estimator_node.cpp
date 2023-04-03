@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <queue>
 #include <map>
 #include <thread>
@@ -8,14 +9,19 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
+#include "tools/tools_logger.hpp"
+#include "common_lib.h"
 #include "estimator.h"
 #include "parameters.h"
 #include "utility/visualization.h"
-#include "./fast_lio/fast_lio.hpp"
+#include "./fast_lio/include/voxel_mapping.h"
+#include "./fast_lio/include/parameter_server.h"
+
 #define CAM_MEASUREMENT_COV 1e-3
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
 StatesGroup g_lio_state;
+std::string sys_time;
 
 Estimator estimator;
 
@@ -113,7 +119,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
 
         if (!(imu_buf.back()->header.stamp.toSec() > feature_buf.front()->header.stamp.toSec() + estimator.td))
         {
-            //ROS_WARN("wait for imu, only should happen at the beginning");
+            // ROS_WARN("wait for imu, only should happen at the beginning");
             sum_of_wait++;
             return measurements;
         }
@@ -143,6 +149,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
 
 void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
 {
+
     sensor_msgs::ImuPtr imu_msg = boost::make_shared<sensor_msgs::Imu>();
     *imu_msg = *_imu_msg;
 
@@ -159,6 +166,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
         ROS_WARN("imu message in disorder!");
         return;
     }
+
     g_camera_lidar_queue.imu_in(imu_msg->header.stamp.toSec());
 
     last_imu_t = imu_msg->header.stamp.toSec();
@@ -182,9 +190,10 @@ void imu_callback(const sensor_msgs::ImuConstPtr &_imu_msg)
 
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
+
     if (!init_feature)
     {
-        //skip the first detected feature, which doesn't contain optical flow speed
+        // skip the first detected feature, which doesn't contain optical flow speed
         init_feature = 1;
         return;
     }
@@ -218,7 +227,7 @@ void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
 
 void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
 {
-    //printf("relocalization callback! \n");
+    // printf("relocalization callback! \n");
     m_buf.lock();
     relo_buf.push(points_msg);
     m_buf.unlock();
@@ -227,24 +236,24 @@ void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
 // thread: visual-inertial odometry
 void unlock_lio(Estimator &estimator)
 {
-    if (estimator.m_fast_lio_instance)
+    if (estimator.m_voxel_map_instance)
     {
-        estimator.m_fast_lio_instance->m_mutex_lio_process.unlock();
+        estimator.m_voxel_map_instance->m_mutex_lio_process.unlock();
     }
 }
 
 void lock_lio(Estimator &estimator)
 {
-    if (estimator.m_fast_lio_instance)
+    if (estimator.m_voxel_map_instance)
     {
-        estimator.m_fast_lio_instance->m_mutex_lio_process.lock();
+        estimator.m_voxel_map_instance->m_mutex_lio_process.lock();
     }
 }
 
 // ANCHOR - sync lio to cam
 void sync_lio_to_vio(Estimator &estimator)
 {
-    check_state(g_lio_state);
+    // check_state(g_lio_state);
     int frame_idx = estimator.frame_count;
     frame_idx = WINDOW_SIZE;
     if (abs(g_camera_lidar_queue.m_last_visual_time - g_lio_state.last_update_time) < 1.0)
@@ -266,8 +275,8 @@ void visual_imu_measure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts
                         const Eigen::Vector3d &Pj, const Eigen::Quaterniond &Qj,
                         const Eigen::Vector3d &tic, const Eigen::Quaterniond &qic,
                         const double inv_dep_i,
-                        Eigen::Vector2d & residual,
-                        Eigen::Matrix<double, 2, 6, Eigen::RowMajor> & j_mat)
+                        Eigen::Vector2d &residual,
+                        Eigen::Matrix<double, 2, 6, Eigen::RowMajor> &j_mat)
 
 {
     Eigen::Matrix2d sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
@@ -277,11 +286,11 @@ void visual_imu_measure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts
     Eigen::Vector3d pts_w = Qi * pts_imu_i + Pi;
     Eigen::Vector3d pts_imu_j = Qj.inverse() * (pts_w - Pj);
     Eigen::Vector3d pts_camera_j = qic.inverse() * (pts_imu_j - tic);
-    
+
     Eigen::Matrix3d Ri = Qi.toRotationMatrix();
     Eigen::Matrix3d Rj = Qj.toRotationMatrix();
     Eigen::Matrix3d ric = qic.toRotationMatrix();
-    
+
     // Eigen::Vector2d residual;
 
     double dep_j = pts_camera_j.z();
@@ -296,13 +305,12 @@ void visual_imu_measure(const Eigen::Vector3d &pts_i, const Eigen::Vector3d &pts
     // Eigen::Map<Eigen::Matrix<double, 2, 7, Eigen::RowMajor>> jacobian_pose_j(jacobians[1]);
 
     Eigen::Matrix<double, 3, 6> jaco_j;
-    Eigen::Matrix<double, 2, 6, Eigen::RowMajor>  j_mat_temp;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> j_mat_temp;
     jaco_j.leftCols<3>() = ric.transpose() * -Rj.transpose();
     jaco_j.rightCols<3>() = ric.transpose() * Utility::skewSymmetric(pts_imu_j);
     j_mat_temp = reduce * jaco_j;
     j_mat.block(0, 3, 2, 3) = j_mat_temp.block(0, 0, 2, 3);
     j_mat.block(0, 0, 2, 3) = j_mat_temp.block(0, 3, 2, 3);
-
 }
 
 void construct_camera_measure(int frame_idx, Estimator &estimator,
@@ -337,8 +345,8 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
         for (auto &it_per_frame : it_per_id.feature_per_frame)
         {
             imu_j++;
-            //if (imu_i == imu_j)
-            if(fabs(imu_i - imu_j) < std::max( double(WINDOW_SIZE / 3), 2.0 ))
+            // if (imu_i == imu_j)
+            if (fabs(imu_i - imu_j) < std::max(double(WINDOW_SIZE / 3), 2.0))
             {
                 continue;
             }
@@ -367,7 +375,7 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
 
                 double inverse_depth = parameters_vec[3][0];
 
-                if(0)
+                if (0)
                 {
                     jacobian_mat_vec[0] = nullptr;
                     jacobian_mat_vec[1] = j_mat_tq.data();
@@ -379,7 +387,7 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
                     j_mat_old.block(0, 0, 2, 3) = j_mat_tq.block(0, 3, 2, 3);
                 }
 
-                if(1)
+                if (1)
                 {
                     visual_imu_measure(pts_i, pts_j, Pi, Qi, Pj, Qj, tic, qic, inverse_depth, residual_vec, j_mat);
                 }
@@ -395,7 +403,6 @@ void construct_camera_measure(int frame_idx, Estimator &estimator,
                          << j_mat_old << endl;
                     cout << "ESIKF first H_mat [2,6]:\r\n"
                          << j_mat << endl;
-                    
                 }
 
                 if (std::isnan(residual_vec.sum()) || std::isnan(j_mat.sum()))
@@ -428,11 +435,13 @@ void process()
 
     g_camera_lidar_queue.m_if_lidar_can_start = g_camera_lidar_queue.m_if_lidar_start_first;
     std_msgs::Header header;
+
     while (true)
     {
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         measurements = getMeasurements();
-        if(measurements.size() == 0)
+
+        if (measurements.size() == 0)
         {
             continue;
         }
@@ -447,7 +456,7 @@ void process()
             double cam_update_tim = img_msg->header.stamp.toSec() + estimator.td;
             // ROS_INFO("Estimated td = %.5f" ,estimator.td );
             // ANCHOR - determine if update of not.
-            if (estimator.m_fast_lio_instance != nullptr)
+            if (estimator.m_voxel_map_instance != nullptr)
             {
                 g_camera_lidar_queue.m_camera_imu_td = estimator.td;
                 g_camera_lidar_queue.m_last_visual_time = img_msg->header.stamp.toSec();
@@ -459,7 +468,8 @@ void process()
                 lock_lio(estimator);
                 t_s.tic();
                 double camera_LiDAR_tim_diff = img_msg->header.stamp.toSec() + g_camera_lidar_queue.m_camera_imu_td - g_lio_state.last_update_time;
-            *p_imu = *(estimator.m_fast_lio_instance->m_imu_process);
+                // *p_imu = *(estimator.m_voxel_map_instance->imu_process_);
+                p_imu = estimator.m_voxel_map_instance->p_imu;
             }
 
             if ((g_camera_lidar_queue.m_if_lidar_can_start == true) && (g_camera_lidar_queue.m_lidar_drag_cam_tim >= 0))
@@ -468,6 +478,7 @@ void process()
                 sync_lio_to_vio(estimator);
                 m_state.unlock();
             }
+
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
             int skip_imu = 0;
             for (auto &imu_msg : measurement.first)
@@ -509,6 +520,7 @@ void process()
                     estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                 }
             }
+
             // set relocalization frame
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
             while (!relo_buf.empty())
@@ -545,13 +557,13 @@ void process()
             for (auto &imu_msg : measurement.first)
             {
                 total_IMU_cnt++;
-                if(imu_msg->header.stamp.toSec() >  g_lio_state.last_update_time )
+                if (imu_msg->header.stamp.toSec() > g_lio_state.last_update_time)
                 {
                     acc_IMU_cnt++;
                     imu_queue.push_back(imu_msg);
                 }
             }
-            
+
             StatesGroup state_aft_integration = g_lio_state;
             int esikf_update_valid = false;
             if (imu_queue.size())
@@ -565,10 +577,11 @@ void process()
                 esikf_update_valid = true;
                 if (g_camera_lidar_queue.m_if_have_lidar_data && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR))
                 {
-                    *p_imu = *(estimator.m_fast_lio_instance->m_imu_process);
-                    state_aft_integration = p_imu->imu_preintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
+                    // *p_imu = *(estimator.m_voxel_map_instance->imu_process_);
+                    p_imu = estimator.m_voxel_map_instance->p_imu;
+                    state_aft_integration = p_imu->ImuPreintegration(g_lio_state, imu_queue, 0, cam_update_tim - imu_queue.back()->header.stamp.toSec());
                     estimator.m_lio_state_prediction_vec[WINDOW_SIZE] = state_aft_integration;
-                    
+
                     diff_vins_lio_q = eigen_q(estimator.Rs[WINDOW_SIZE].transpose() * state_aft_integration.rot_end);
                     diff_vins_lio_t = state_aft_integration.pos_end - estimator.Ps[WINDOW_SIZE];
                     if (diff_vins_lio_t.norm() > 1.0)
@@ -588,8 +601,8 @@ void process()
                     {
                         // esikf_update_valid = false;
                         scope_color(ANSI_COLOR_RED_BOLD);
-                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator.m_fast_lio_instance->first_lidar_time << endl;
-                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator.m_fast_lio_instance->first_lidar_time << endl;
+                        cout << "Start time = " << std::setprecision(8) << imu_queue.front()->header.stamp.toSec() - estimator.m_voxel_map_instance->first_lidar_time_ << endl;
+                        cout << "Final time = " << std::setprecision(8) << cam_update_tim - estimator.m_voxel_map_instance->first_lidar_time_ << endl;
                         cout << "Start dt = " << start_dt << std::setprecision(2) << endl;
                         cout << "Final dt = " << end_dt << std::setprecision(2) << endl;
                         cout << "LiDAR->Image preintegration: " << start_dt << " <--> " << end_dt << endl;
@@ -615,20 +628,19 @@ void process()
                 xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
                 image[feature_id].emplace_back(camera_id, xyz_uv_velocity);
             }
+
             // t_s.tic();
             estimator.processImage(image, img_msg->header);
             // estimator.vector2double();
-            //Step 1: IMU preintergration
+            // Step 1: IMU preintergration
             StatesGroup state_prediction = state_aft_integration;
 
             // //Step 3: ESIKF udpate.
             double mean_reprojection_error = 0.0;
             int minmum_number_of_camera_res = 10;
-            
+
             StatesGroup state_before_esikf = g_lio_state;
-            if (esikf_update_valid && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR) 
-                && (g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim)
-                )
+            if (esikf_update_valid && (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR) && (g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim))
             {
                 estimator.vector2double();
                 estimator.f_manager.triangulate(estimator.Ps, estimator.tic, estimator.ric);
@@ -666,13 +678,13 @@ void process()
                         cout << "Size of reppro_err_vec: " << reppro_err_vec.size() << endl;
                         break;
                     }
-                    
+
                     // TODO: Add camera residual here
                     Hsub.resize(reppro_err_vec.size() * 2, 6);
                     meas_vec.resize(reppro_err_vec.size() * 2, 1);
                     K.resize(DIM_OF_STATES, reppro_err_vec.size());
                     int features_correspondences = reppro_err_vec.size();
-                    
+
                     for (int residual_idx = 0; residual_idx < reppro_err_vec.size(); residual_idx++)
                     {
                         meas_vec.block(residual_idx * 2, 0, 2, 1) = -1 * reppro_err_vec[residual_idx];
@@ -688,7 +700,7 @@ void process()
                     K_1 = (H_T_H + (state_aft_integration.cov * CAM_MEASUREMENT_COV).inverse()).inverse();
                     K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
                     auto vec = state_prediction - state_aft_integration;
-                    solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0) );
+                    solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
 
                     mean_reprojection_error = abs(meas_vec.mean());
 
@@ -703,12 +715,12 @@ void process()
                     rot_add = (solution).block<3, 1>(0, 0);
                     t_add = solution.block<3, 1>(3, 0);
                     flg_EKF_converged = false;
-                    if (((rot_add.norm() * 57.3 - deltaR) < 0.01) && ((t_add.norm()  - deltaT) < 0.015))
+                    if (((rot_add.norm() * 57.3 - deltaR) < 0.01) && ((t_add.norm() - deltaT) < 0.015))
                     {
                         flg_EKF_converged = true;
                     }
                     deltaR = rot_add.norm() * 57.3;
-                    deltaT = t_add.norm() ;
+                    deltaT = t_add.norm();
                 }
                 if (reppro_err_vec.size() >= minmum_number_of_camera_res)
                 {
@@ -727,16 +739,11 @@ void process()
                         {
                             g_lio_state = state_before_esikf;
                         }
-                        // Unblock lio process, publish esikf state.
-                        // TODO: publish esikf state.
-                        // unlock_lio(estimator);
-                        // g_camera_lidar_queue.m_last_visual_time  = g_lio_state.last_update_time + 0.02; // Unblock lio process, forward 80 ms
-                    
                     }
                 }
             }
 
-            // Update state with pose graph optimization 
+            // Update state with pose graph optimization
             g_lio_state = state_before_esikf;
             t_s.tic();
             estimator.solve_image_pose(img_msg->header);
@@ -755,7 +762,7 @@ void process()
                     if ((g_lio_state.last_update_time - g_camera_lidar_queue.m_visual_init_time > g_camera_lidar_queue.m_lidar_drag_cam_tim))
                     {
                         StatesGroup state_before_esikf = g_lio_state;
-                        if(estimator.Bas[WINDOW_SIZE].norm() < 0.5)
+                        if (estimator.Bas[WINDOW_SIZE].norm() < 0.5)
                         {
                             g_lio_state.bias_a = estimator.Bas[WINDOW_SIZE];
                         }
@@ -764,11 +771,11 @@ void process()
                         g_lio_state.cov = state_aft_integration.cov;
 
                         Eigen::Matrix3d temp_R = estimator.Rs[WINDOW_SIZE] * diff_vins_lio_q.toRotationMatrix();
-                        Eigen::Vector3d temp_T =  estimator.Ps[WINDOW_SIZE] + diff_vins_lio_t;
+                        Eigen::Vector3d temp_T = estimator.Ps[WINDOW_SIZE] + diff_vins_lio_t;
                         eigen_q q_I = eigen_q(1.0, 0, 0, 0);
                         double angular_diff = eigen_q(temp_R.transpose() * state_before_esikf.rot_end).angularDistance(q_I) * 57.3;
                         double t_diff = (temp_T - state_before_esikf.pos_end).norm();
-                        if ((t_diff < 0.2) &&  (angular_diff < 2.0))
+                        if ((t_diff < 0.2) && (angular_diff < 2.0))
                         {
                             g_lio_state.cov = state_aft_integration.cov;
                             g_lio_state.last_update_time = cam_update_tim;
@@ -777,7 +784,6 @@ void process()
                         }
                         unlock_lio(estimator);
                     }
-                    
                 }
             }
             if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
@@ -792,13 +798,14 @@ void process()
                 }
                 m_state.unlock();
             }
+
             unlock_lio(estimator);
             m_state.lock();
             double whole_t = t_s.toc();
             printStatistics(estimator, whole_t);
             header = img_msg->header;
             header.frame_id = "world";
-  
+
             if (g_camera_lidar_queue.m_if_have_lidar_data == false)
             {
                 pubOdometry(estimator, header);
@@ -824,11 +831,21 @@ void process()
         m_state.lock();
         if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
         {
-                update();
+            update();
         }
         m_state.unlock();
         m_buf.unlock();
     }
+}
+
+std::string getSystemTime()
+{
+    FILE *fp = NULL;
+    time_t timep;
+    char name[256] = {0};
+    time(&timep); // 获取从1970至今过了多少秒，存入time_t类型的timep
+    strftime(name, sizeof(name), "%Y_%m_%d_%H_%M_%S", localtime(&timep));
+    return name;
 }
 
 int main(int argc, char **argv)
@@ -836,25 +853,28 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "vins_estimator");
     ros::NodeHandle nh("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
-    // ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+
+    ParameterServer *para_server = ParameterServer::GetInstance();
+    para_server->InitParamWithRos(nh);
+
     readParameters(nh);
     estimator.setParameter();
 
-    get_ros_parameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
-    get_ros_parameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
-    get_ros_parameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
-    get_ros_parameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
-    get_ros_parameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
-    get_ros_parameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
-    if(g_camera_lidar_queue.m_if_write_res_to_bag)
+    GetROSParameter(nh, "/lidar_drag_cam_tim", g_camera_lidar_queue.m_lidar_drag_cam_tim, 1.0);
+    GetROSParameter(nh, "/acc_mul_G", g_camera_lidar_queue.m_if_acc_mul_G, 0);
+    GetROSParameter(nh, "/if_lidar_start_first", g_camera_lidar_queue.m_if_lidar_start_first, 1.0);
+    GetROSParameter<int>(nh, "/if_write_to_bag", g_camera_lidar_queue.m_if_write_res_to_bag, false);
+    GetROSParameter<int>(nh, "/if_dump_log", g_camera_lidar_queue.m_if_dump_log, 0);
+    GetROSParameter<std::string>(nh, "/record_bag_name", g_camera_lidar_queue.m_bag_file_name, "./");
+    if (g_camera_lidar_queue.m_if_write_res_to_bag)
     {
         g_camera_lidar_queue.init_rosbag_for_recording();
     }
     // ANCHOR - Start lio process
     g_camera_lidar_queue.m_if_lidar_can_start = false;
-    if (estimator.m_fast_lio_instance == nullptr)
+    if (estimator.m_voxel_map_instance == nullptr)
     {
-        estimator.m_fast_lio_instance = new Fast_lio();
+        estimator.m_voxel_map_instance = new VoxelMapping(nh);
     }
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
@@ -868,7 +888,8 @@ int main(int argc, char **argv)
     ros::Subscriber sub_restart = nh.subscribe("/feature_tracker/restart", 20000, restart_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_relo_points = nh.subscribe("/pose_graph/match_points", 20000, relocalization_callback, ros::TransportHints().tcpNoDelay());
 
-    std::thread measurement_process{process};
+    // sys_time = getSystemTime();
+    std::thread measurement_process(process);
     ros::spin();
 
     return 0;
